@@ -31,6 +31,7 @@ const dom = {
   lyricScroll: el('lyricScroll'),
   lyricBadge: el('lyricBadge'),
   lyricsMenu: el('lyricsMenu'),
+  btnOpenLyricsCache: el('btnOpenLyricsCache'),
   transportRate: el('transportRate'),
   transportFmt: el('transportFmt'),
   trackIndex: el('trackIndex'),
@@ -1196,7 +1197,18 @@ if (dom.lyricsMenu) {
         dom.lyricBadge.className = 'lyric-badge mono dim';
       }
     } else if (act === 'folder') {
-      if (hasDesktop && window.jt.lyricsCachePath) {
+      if (hasDesktop && window.jt.openLyricsCacheDir) {
+        const r = await window.jt.openLyricsCacheDir();
+        if (dom.lyricBadge) {
+          if (r && r.ok) {
+            dom.lyricBadge.textContent = '已打开歌词缓存目录';
+            dom.lyricBadge.className = 'lyric-badge mono';
+          } else {
+            dom.lyricBadge.textContent = `无法打开：${r?.path || r?.error || '缓存目录'}`;
+            dom.lyricBadge.className = 'lyric-badge mono dim';
+          }
+        }
+      } else if (hasDesktop && window.jt.lyricsCachePath) {
         const p = await window.jt.lyricsCachePath();
         if (p && dom.lyricBadge) {
           dom.lyricBadge.textContent = `缓存：${p}`;
@@ -3158,6 +3170,22 @@ window.addEventListener('resize', () => {
 
 // Settings UI
 if (dom.btnBrand) dom.btnBrand.addEventListener('click', openSettings);
+
+if (dom.btnOpenLyricsCache) {
+  dom.btnOpenLyricsCache.addEventListener('click', async () => {
+    if (!hasDesktop || !window.jt.openLyricsCacheDir) {
+      const hint = el('lyricsCachePathHint');
+      if (hint) hint.textContent = '仅桌面版支持打开目录';
+      return;
+    }
+    const r = await window.jt.openLyricsCacheDir();
+    const hint = el('lyricsCachePathHint');
+    if (hint) {
+      if (r && r.ok) hint.textContent = `歌词缓存：${r.path}（已在资源管理器打开）`;
+      else hint.textContent = `歌词缓存打开失败：${r?.error || r?.path || ''}`;
+    }
+  });
+}
 if (dom.btnCloseSettings) dom.btnCloseSettings.addEventListener('click', closeSettings);
 if (dom.btnCloseSettingsFoot) dom.btnCloseSettingsFoot.addEventListener('click', () => {
   persistSettingsFromForm();

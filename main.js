@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -623,6 +623,32 @@ ipcMain.handle('lyrics:clearCache', async (_e, payload) => {
 });
 
 ipcMain.handle('lyrics:cachePath', async () => getLyricsCacheDir());
+
+ipcMain.handle('lyrics:openCacheDir', async () => {
+  try {
+    const dir = getLyricsCacheDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const err = await shell.openPath(dir);
+    return { ok: !err, path: dir, error: err || null };
+  } catch (e) {
+    return { ok: false, path: null, error: String(e.message || e) };
+  }
+});
+
+ipcMain.handle('shell:openPath', async (_e, target) => {
+  try {
+    if (!target) return { ok: false, error: 'empty path' };
+    const p = String(target);
+    if (!fs.existsSync(p)) {
+      return { ok: false, error: 'path not found', path: p };
+    }
+    const st = fs.statSync(p);
+    const err = await shell.openPath(st.isDirectory() ? p : path.dirname(p));
+    return { ok: !err, path: p, error: err || null };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  }
+});
 
 app.whenReady().then(() => {
   protocol.registerFileProtocol('jtfile', (request, callback) => {

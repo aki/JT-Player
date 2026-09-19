@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('jt', {
   searchLyricCandidates: (payload) => ipcRenderer.invoke('lyrics:searchCandidates', payload),
   clearLyricsCache: (payload) => ipcRenderer.invoke('lyrics:clearCache', payload),
   lyricsCachePath: () => ipcRenderer.invoke('lyrics:cachePath'),
+  openLyricsCacheDir: () => ipcRenderer.invoke('lyrics:openCacheDir'),
+  openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
