@@ -55,15 +55,15 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-win-${target}.${ext}"
-    },
-    "win32metadata": {
-      "CompanyName": "JT Player",
-      "FileDescription": "JT Player 静听",
-      "ProductName": "JT Player 静听",
-      "InternalName": "JT Player",
-      "OriginalFilename": "JT Player.exe",
-      "LegalCopyright": "Copyright © 2026 JT Player"
+      "artifactName": "${productName}-${version}-win-${target}.${ext}",
+      "win32metadata": {
+        "CompanyName": "JT Player",
+        "FileDescription": "JT Player 静听",
+        "ProductName": "JT Player 静听",
+        "InternalName": "JT Player",
+        "OriginalFilename": "JT Player.exe",
+        "LegalCopyright": "Copyright © 2026 JT Player"
+      }
     },
     "nsis": {
       "oneClick": false,
