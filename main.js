@@ -268,6 +268,7 @@ function saveAppState(state) {
 }
 
 function createWindow() {
+  const iconPath = path.join(__dirname, 'src', 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -278,6 +279,7 @@ function createWindow() {
     maximized: true,
     backgroundColor: '#090A0C',
     title: 'JT Player 静听',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

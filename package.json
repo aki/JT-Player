@@ -34,11 +34,13 @@
       "preload.js",
       "src/**/*",
       "package.json",
+      "build/icon.png",
+      "build/icon.ico",
       "node_modules/**/*"
     ],
     "asar": false,
     "win": {
-      "icon": "build/icon.png",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "sign": null,
       "target": [
