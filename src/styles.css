@@ -19,6 +19,14 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 全界面鼠标样式不变，统一默认箭头 */
+html, body, #app,
+#app *,
+#app *::before,
+#app *::after {
+  cursor: default !important;
+}
+
 html, body {
   height: 100%;
   background: var(--bg);
