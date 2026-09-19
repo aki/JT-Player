@@ -1602,6 +1602,50 @@ function scrollPlaylistToIndex(index) {
   box.scrollTop = Math.max(0, offset);
 }
 
+/** 点击曲名：列表定位到当前播放歌曲 */
+function locateCurrentPlayingTrack() {
+  if (state.index < 0 || !state.tracks.length) return;
+  const idx = state.index;
+  const track = state.tracks[idx];
+  if (state.searchQuery.trim() && track && !matchesSearch(track, state.searchQuery)) {
+    state.searchQuery = '';
+    if (dom.playlistSearchInput) dom.playlistSearchInput.value = '';
+  }
+  setSingleSelection(idx);
+  renderPlaylist();
+  scrollPlaylistToIndex(idx);
+  if (dom.playlist) {
+    dom.playlist.classList.remove('flash-playing');
+    void dom.playlist.offsetWidth;
+    dom.playlist.classList.add('flash-playing');
+  }
+}
+
+if (dom.nowTitle) {
+  dom.nowTitle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    locateCurrentPlayingTrack();
+  });
+}
+if (dom.nowCard) {
+  dom.nowCard.addEventListener('click', locateCurrentPlayingTrack);
+  dom.nowCard.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      locateCurrentPlayingTrack();
+    }
+  });
+}
+if (dom.statusNowPlaying) {
+  dom.statusNowPlaying.addEventListener('click', locateCurrentPlayingTrack);
+  dom.statusNowPlaying.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      locateCurrentPlayingTrack();
+    }
+  });
+}
+
 function renderPlaylist() {
   const hits = new Set(getSearchHitIndices());
   const filteringHighlight = hits.size > 0;

@@ -15,7 +15,7 @@
         <button type="button" class="brand-name" id="btnBrand" title="打开设置">JT Player</button>
         <span class="brand-sub" id="brandSub">静听 · 音乐静听中</span>
       </div>
-      <div class="status-center" id="statusNowPlaying">正在播放：未选择曲目</div>
+      <div class="status-center" id="statusNowPlaying" title="点击定位到列表中的当前歌曲" role="button" tabindex="0">正在播放：未选择曲目</div>
       <div class="status-right">
         <span class="led" id="engineLed"></span>
         <span class="mono dim" id="engineState">STANDBY</span>
@@ -188,7 +188,7 @@
     <main class="shell">
       <!-- LEFT: playlist -->
       <aside class="panel playlist-panel">
-        <div class="now-card" id="nowCard">
+        <div class="now-card" id="nowCard" title="点击定位到列表中的当前歌曲" role="button" tabindex="0">
           <div class="now-cover-wrap">
             <img id="nowCover" alt="" />
             <div class="now-cover-fallback" id="nowCoverFallback">JT</div>
