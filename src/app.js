@@ -31,7 +31,6 @@ const dom = {
   lyricScroll: el('lyricScroll'),
   lyricBadge: el('lyricBadge'),
   lyricsMenu: el('lyricsMenu'),
-  btnOpenLyricsMenu: el('btnOpenLyricsMenu'),
   stageChip: el('stageChip'),
   btnOpenLyricsCache: el('btnOpenLyricsCache'),
   transportRate: el('transportRate'),
@@ -1190,15 +1189,6 @@ if (dom.lyricBadge) {
   });
 }
 
-if (dom.btnOpenLyricsMenu) {
-  dom.btnOpenLyricsMenu.addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (dom.lyricsMenu && !dom.lyricsMenu.hidden) hideLyricsMenu();
-    else showLyricsMenu();
-  });
-}
-
 if (dom.stageChip) {
   dom.stageChip.style.pointerEvents = 'auto';
   dom.stageChip.style.cursor = 'pointer';
@@ -1273,7 +1263,7 @@ if (dom.lyricsMenu) {
 
 document.addEventListener('click', (e) => {
   if (!dom.lyricsMenu || dom.lyricsMenu.hidden) return;
-  if (e.target.closest('#lyricsMenu') || e.target.closest('#lyricBadge') || e.target.closest('#btnOpenLyricsMenu')) return;
+  if (e.target.closest('#lyricsMenu') || e.target.closest('#lyricBadge')) return;
   hideLyricsMenu();
 });
 

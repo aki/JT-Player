@@ -846,45 +846,31 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   left: 12px;
   bottom: 12px;
   z-index: 30;
-  padding: 4px 8px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
-  background: rgba(9,10,12,0.85);
+  background: rgba(9,10,12,0.88);
   color: var(--gold);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   pointer-events: auto !important;
   cursor: pointer;
+  max-width: min(70%, 420px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .lyric-badge.dim { color: var(--muted); }
 .lyric-badge:hover {
   color: #fff;
   border-color: var(--signal);
-}
-
-.lyrics-open-btn {
-  position: absolute;
-  left: 12px;
-  bottom: 42px;
-  z-index: 30;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--line);
-  background: rgba(9, 10, 12, 0.85);
-  color: var(--gold);
-  font-size: 14px;
-  font-weight: 700;
-  pointer-events: auto !important;
-}
-.lyrics-open-btn:hover {
-  color: #fff;
-  border-color: var(--signal);
-  background: rgba(61, 219, 217, 0.15);
+  background: rgba(61, 219, 217, 0.12);
 }
 
 .lyrics-menu {
   position: absolute;
   left: 12px;
-  bottom: 84px;
+  bottom: 48px;
   z-index: 40;
   min-width: 220px;
   padding: 4px;
