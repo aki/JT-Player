@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.jtplayer.shenTing",
     "productName": "JT Player",
+    "executableName": "JT Player",
     "copyright": "Copyright © 2026 JT Player",
     "directories": {
       "output": "release",
@@ -41,6 +42,7 @@
     "asar": false,
     "win": {
       "icon": "build/icon.ico",
+      "executableName": "JT Player",
       "signAndEditExecutable": false,
       "sign": null,
       "target": [
@@ -54,6 +56,14 @@
         }
       ],
       "artifactName": "${productName}-${version}-win-${target}.${ext}"
+    },
+    "win32metadata": {
+      "CompanyName": "JT Player",
+      "FileDescription": "JT Player 静听",
+      "ProductName": "JT Player 静听",
+      "InternalName": "JT Player",
+      "OriginalFilename": "JT Player.exe",
+      "LegalCopyright": "Copyright © 2026 JT Player"
     },
     "nsis": {
       "oneClick": false,

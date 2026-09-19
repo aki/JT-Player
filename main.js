@@ -13,6 +13,10 @@ const AUDIO_EXT = new Set([
 
 let mainWindow = null;
 
+// 任务管理器 / 任务栏显示为 JT Player
+app.setName('JT Player');
+app.setAppUserModelId('com.jtplayer.shenTing');
+
 // 允许启动时自动播放（无需先点击页面）
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
