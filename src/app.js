@@ -31,6 +31,8 @@ const dom = {
   lyricScroll: el('lyricScroll'),
   lyricBadge: el('lyricBadge'),
   lyricsMenu: el('lyricsMenu'),
+  btnOpenLyricsMenu: el('btnOpenLyricsMenu'),
+  stageChip: el('stageChip'),
   btnOpenLyricsCache: el('btnOpenLyricsCache'),
   transportRate: el('transportRate'),
   transportFmt: el('transportFmt'),
@@ -1062,21 +1064,37 @@ function lyricsRequestPayload(track) {
   };
 }
 
+function setLyricBadge(text, dim = false) {
+  if (!dom.lyricBadge) return;
+  dom.lyricBadge.textContent = text;
+  dom.lyricBadge.className = dim ? 'lyric-badge mono dim' : 'lyric-badge mono';
+}
+
 function hideLyricsMenu() {
   if (dom.lyricsMenu) dom.lyricsMenu.hidden = true;
 }
 
 function showLyricsMenu() {
   if (!dom.lyricsMenu) return;
+  hideSettingsMaybe();
   const track = currentTrackForLyrics();
   const hasTrack = !!track;
   dom.lyricsMenu.querySelectorAll('button[data-lact]').forEach((btn) => {
     const act = btn.getAttribute('data-lact');
-    btn.disabled = !hasTrack && act !== 'folder' && act !== 'toggle-online';
+    btn.disabled = !hasTrack && act !== 'folder' && act !== 'toggle-online' && act !== 'clear-all';
   });
   const toggle = dom.lyricsMenu.querySelector('[data-lact="toggle-online"]');
   if (toggle) toggle.textContent = state.onlineLyrics === false ? '恢复联网搜索' : '暂停联网搜索';
   dom.lyricsMenu.hidden = false;
+  // 立刻可见反馈，避免“点了没反应”
+  if (hasTrack) {
+    const meta = track.meta || {};
+    setLyricBadge(`菜单 · ${meta.title || track.name}`);
+  }
+}
+
+function hideSettingsMaybe() {
+  /* keep settings as-is */
 }
 
 async function refreshCurrentLyrics({ ignoreCache = true, clearCacheFirst = false } = {}) {
@@ -1166,6 +1184,27 @@ async function switchToNextLyricCandidate() {
 if (dom.lyricBadge) {
   dom.lyricBadge.addEventListener('click', (e) => {
     e.stopPropagation();
+    e.preventDefault();
+    if (dom.lyricsMenu && !dom.lyricsMenu.hidden) hideLyricsMenu();
+    else showLyricsMenu();
+  });
+}
+
+if (dom.btnOpenLyricsMenu) {
+  dom.btnOpenLyricsMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (dom.lyricsMenu && !dom.lyricsMenu.hidden) hideLyricsMenu();
+    else showLyricsMenu();
+  });
+}
+
+if (dom.stageChip) {
+  dom.stageChip.style.pointerEvents = 'auto';
+  dom.stageChip.style.cursor = 'pointer';
+  dom.stageChip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (dom.lyricsMenu && !dom.lyricsMenu.hidden) hideLyricsMenu();
     else showLyricsMenu();
   });
@@ -1178,41 +1217,55 @@ if (dom.lyricsMenu) {
     const act = btn.getAttribute('data-lact');
     hideLyricsMenu();
     const track = currentTrackForLyrics();
+
     if (act === 'refresh') {
+      setLyricBadge('重新搜索歌词…');
       await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: true });
+      setLyricBadge(dom.lyricBadge.textContent.startsWith('重新搜索') ? '歌词已更新' : dom.lyricBadge.textContent);
     } else if (act === 'next') {
       lyricCandidateIdx = 0;
       await switchToNextLyricCandidate();
     } else if (act === 'clear') {
+      let removed = 0;
+      let cachePath = '';
       if (track && hasDesktop && window.jt.clearLyricsCache) {
-        await window.jt.clearLyricsCache(lyricsRequestPayload(track));
+        const payload = lyricsRequestPayload(track);
+        setLyricBadge('正在清除缓存…');
+        const r = await window.jt.clearLyricsCache(payload);
+        removed = r?.removed || 0;
+        cachePath = r?.path || '';
+      }
+      setLyricBadge(`已清除缓存 ${removed} 个，重新搜索中…`);
+      clearLyricsState();
+      if (track) {
+        state.lyrics.trackId = track.id;
+        setLyricsFallback(track);
       }
       await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: false });
+      if (dom.lyricBadge && dom.lyricBadge.textContent.includes('重新搜索中')) {
+        setLyricBadge(removed > 0 ? `已清除 ${removed} 个缓存` : '本曲无匹配缓存，已忽略缓存重搜', removed === 0);
+      }
+    } else if (act === 'clear-all') {
+      if (hasDesktop && window.jt.clearAllLyricsCache) {
+        setLyricBadge('正在清空歌词缓存…');
+        const r = await window.jt.clearAllLyricsCache();
+        setLyricBadge(`已清空缓存 ${r?.removed || 0} 个`);
+        if (track) {
+          clearLyricsState();
+          state.lyrics.trackId = track.id;
+          await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: false });
+        }
+      }
     } else if (act === 'toggle-online') {
       state.onlineLyrics = state.onlineLyrics === false;
       saveSettings({ onlineLyrics: state.onlineLyrics });
       if (dom.setOnlineLyrics) dom.setOnlineLyrics.checked = state.onlineLyrics !== false;
-      if (!state.onlineLyrics && dom.lyricBadge) {
-        dom.lyricBadge.textContent = '已暂停联网歌词';
-        dom.lyricBadge.className = 'lyric-badge mono dim';
-      }
+      setLyricBadge(state.onlineLyrics === false ? '已暂停联网歌词' : '已恢复联网歌词', state.onlineLyrics === false);
     } else if (act === 'folder') {
       if (hasDesktop && window.jt.openLyricsCacheDir) {
         const r = await window.jt.openLyricsCacheDir();
-        if (dom.lyricBadge) {
-          if (r && r.ok) {
-            dom.lyricBadge.textContent = '已打开歌词缓存目录';
-            dom.lyricBadge.className = 'lyric-badge mono';
-          } else {
-            dom.lyricBadge.textContent = `无法打开：${r?.path || r?.error || '缓存目录'}`;
-            dom.lyricBadge.className = 'lyric-badge mono dim';
-          }
-        }
-      } else if (hasDesktop && window.jt.lyricsCachePath) {
-        const p = await window.jt.lyricsCachePath();
-        if (p && dom.lyricBadge) {
-          dom.lyricBadge.textContent = `缓存：${p}`;
-        }
+        if (r && r.ok) setLyricBadge('已打开歌词缓存目录');
+        else setLyricBadge(`无法打开：${r?.error || r?.path || ''}`, true);
       }
     }
   });
@@ -1220,7 +1273,7 @@ if (dom.lyricsMenu) {
 
 document.addEventListener('click', (e) => {
   if (!dom.lyricsMenu || dom.lyricsMenu.hidden) return;
-  if (e.target.closest('#lyricsMenu') || e.target.closest('#lyricBadge')) return;
+  if (e.target.closest('#lyricsMenu') || e.target.closest('#lyricBadge') || e.target.closest('#btnOpenLyricsMenu')) return;
   hideLyricsMenu();
 });
 

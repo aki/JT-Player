@@ -207,30 +207,77 @@ async function searchQqLyrics(title, artist) {
   };
 }
 
-function clearLyricsCacheFor(title, artist, path) {
+function clearLyricsCacheFor(title, artist, filePath) {
   const dir = getLyricsCacheDir();
-  const keys = new Set();
-  if (title || artist) keys.add(lyricsCacheKey(artist, title));
-  if (path) {
-    const base = path.parse ? path.parse(path).name : require('path').parse(path).name;
-    keys.add(lyricsCacheKey('', base));
-    keys.add(lyricsCacheKey(artist || '', base));
+  const pathMod = require('path');
+  const needles = [];
+  const push = (s) => {
+    const t = String(s || '').trim().toLowerCase();
+    if (t && t !== '未知艺术家') needles.push(t);
+  };
+  push(title);
+  push(artist);
+  if (filePath) push(pathMod.parse(String(filePath)).name);
+
+  // 曲名拆成较长片段，便于匹配缓存文件名
+  const tokens = [];
+  for (const n of needles) {
+    const flat = n.replace(/[\s_]+/g, '');
+    if (flat.length >= 2) tokens.push(flat);
+    // 中文连续子串
+    const parts = n.split(/[\s\-_/·、,，]+/).filter((x) => x.length >= 2);
+    for (const p of parts) tokens.push(p.replace(/[\s_]+/g, ''));
   }
+
+  const exact = new Set();
+  if (title || artist) exact.add(lyricsCacheKey(artist, title));
+  if (filePath) {
+    const base = pathMod.parse(String(filePath)).name;
+    exact.add(lyricsCacheKey('', base));
+    exact.add(lyricsCacheKey(artist || '', base));
+  }
+
   let removed = 0;
+  let total = 0;
   try {
+    fs.mkdirSync(dir, { recursive: true });
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.lrc')) continue;
+      if (!f.toLowerCase().endsWith('.lrc')) continue;
+      total += 1;
       const name = f.replace(/\.lrc$/i, '');
-      if (keys.has(name)) {
-        try { fs.unlinkSync(path.join(dir, f)); removed += 1; } catch { /* ignore */ }
+      const nameLo = name.toLowerCase();
+      const nameFlat = nameLo.replace(/[_\s]+/g, '');
+      let hit = exact.has(name);
+      if (!hit) {
+        for (const tk of tokens) {
+          if (tk && nameFlat.includes(tk)) {
+            hit = true;
+            break;
+          }
+        }
       }
-      // 宽松：文件名包含曲名
-      if (title && name.includes(String(title).slice(0, 8))) {
-        try { fs.unlinkSync(path.join(dir, f)); removed += 1; } catch { /* ignore */ }
+      if (hit) {
+        try {
+          fs.unlinkSync(pathMod.join(dir, f));
+          removed += 1;
+        } catch { /* ignore */ }
       }
     }
   } catch { /* ignore */ }
-  return { ok: true, removed };
+
+  return { ok: true, removed, total, path: dir, title, artist, needles };
+}
+
+function clearAllLyricsCache() {
+  const dir = getLyricsCacheDir();
+  let removed = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.toLowerCase().endsWith('.lrc')) continue;
+      try { fs.unlinkSync(path.join(dir, f)); removed += 1; } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+  return { ok: true, removed, path: dir };
 }
 
 /** 返回多条候选歌词（当前仅网易多结果；QQ 取最优一条） */
@@ -617,6 +664,14 @@ ipcMain.handle('lyrics:searchCandidates', async (_e, payload) => {
 ipcMain.handle('lyrics:clearCache', async (_e, payload) => {
   try {
     return clearLyricsCacheFor(payload?.title, payload?.artist, payload?.path);
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('lyrics:clearAllCache', async () => {
+  try {
+    return clearAllLyricsCache();
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }

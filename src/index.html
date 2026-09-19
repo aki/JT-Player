@@ -242,12 +242,14 @@
             <div class="lyrics-menu" id="lyricsMenu" hidden>
               <button type="button" data-lact="refresh">重新搜索（忽略缓存）</button>
               <button type="button" data-lact="next">换一条网络歌词</button>
-              <button type="button" data-lact="clear">清除本曲缓存</button>
+              <button type="button" data-lact="clear">清除本曲缓存并重搜</button>
+              <button type="button" data-lact="clear-all">清空全部歌词缓存</button>
               <button type="button" data-lact="toggle-online">暂停联网搜索</button>
               <button type="button" data-lact="folder">打开歌词缓存目录</button>
             </div>
+            <button type="button" class="lyrics-open-btn" id="btnOpenLyricsMenu" title="歌词菜单：纠错 / 刷新 / 缓存">词</button>
           </div>
-          <div class="stage-chip mono" id="stageChip">LASER STANDBY</div>
+          <div class="stage-chip mono" id="stageChip" title="歌词菜单">LASER STANDBY</div>
         </div>
 
         <div class="vu-block">
