@@ -45,6 +45,7 @@
       "executableName": "JT Player",
       "signAndEditExecutable": false,
       "sign": null,
+      "publisherName": "JT Player",
       "target": [
         {
           "target": "nsis",
@@ -55,15 +56,7 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-win-${target}.${ext}",
-      "win32metadata": {
-        "CompanyName": "JT Player",
-        "FileDescription": "JT Player 静听",
-        "ProductName": "JT Player 静听",
-        "InternalName": "JT Player",
-        "OriginalFilename": "JT Player.exe",
-        "LegalCopyright": "Copyright © 2026 JT Player"
-      }
+      "artifactName": "${productName}-${version}-win-${target}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -87,7 +80,9 @@
       { "ext": "opus", "name": "Opus Audio", "role": "Viewer" }
     ],
     "extraMetadata": {
-      "main": "main.js"
+      "main": "main.js",
+      "productName": "JT Player",
+      "description": "JT Player 静听"
     }
   }
 }
