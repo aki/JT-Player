@@ -1,0 +1,81 @@
+{
+  "name": "jt-player",
+  "productName": "JT Player",
+  "version": "0.1.0",
+  "description": "JT Player 静听 — 本地 HiFi 音乐播放器",
+  "main": "main.js",
+  "author": "JT Player",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "jt": "electron .",
+    "build": "electron .",
+    "build:release": "node scripts/build-release.js",
+    "build:portable": "node scripts/build-release.js"
+  },
+  "dependencies": {
+    "music-metadata": "^10.8.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.jtplayer.shenTing",
+    "productName": "JT Player",
+    "copyright": "Copyright © 2026 JT Player",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "asar": false,
+    "win": {
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false,
+      "sign": null,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-win-${target}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "JT Player 静听",
+      "artifactName": "${productName}-${version}-win-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-portable.${ext}"
+    },
+    "fileAssociations": [
+      { "ext": "mp3", "name": "MP3 Audio", "role": "Viewer" },
+      { "ext": "flac", "name": "FLAC Audio", "role": "Viewer" },
+      { "ext": "wav", "name": "WAV Audio", "role": "Viewer" },
+      { "ext": "m4a", "name": "M4A Audio", "role": "Viewer" },
+      { "ext": "ogg", "name": "OGG Audio", "role": "Viewer" },
+      { "ext": "aac", "name": "AAC Audio", "role": "Viewer" },
+      { "ext": "opus", "name": "Opus Audio", "role": "Viewer" }
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    }
+  }
+}

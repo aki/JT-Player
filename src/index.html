@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JT Player 静听</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Status strip -->
+    <header class="status-strip">
+      <div class="status-left">
+        <span class="brand-mark" aria-hidden="true">◉</span>
+        <button type="button" class="brand-name" id="btnBrand" title="打开设置">JT Player</button>
+        <span class="brand-sub" id="brandSub">静听 · 音乐静听中</span>
+      </div>
+      <div class="status-center" id="statusNowPlaying">正在播放：未选择曲目</div>
+      <div class="status-right">
+        <span class="led" id="engineLed"></span>
+        <span class="mono dim" id="engineState">STANDBY</span>
+      </div>
+    </header>
+
+    <!-- Settings -->
+    <div class="settings-overlay" id="settingsOverlay" hidden>
+      <div class="settings-panel" role="dialog" aria-labelledby="settingsTitle">
+        <div class="settings-head">
+          <h2 id="settingsTitle">设置 · JT Player 静听</h2>
+          <button type="button" class="icon-btn" id="btnCloseSettings" title="关闭" aria-label="关闭设置">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.4 5l5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+          </button>
+        </div>
+
+        <div class="settings-body">
+          <section class="settings-group">
+            <h3>播放</h3>
+            <label class="settings-row">
+              <span>默认循环模式</span>
+              <select id="setRepeat">
+                <option value="one">单曲循环</option>
+                <option value="shuffle">随机</option>
+                <option value="all">列表循环</option>
+              </select>
+            </label>
+            <label class="settings-row">
+              <span>键盘音量步进</span>
+              <select id="setVolumeStep">
+                <option value="0.02">2%</option>
+                <option value="0.05">5%</option>
+                <option value="0.10">10%</option>
+              </select>
+            </label>
+            <label class="settings-row">
+              <span>添加文件后自动播放</span>
+              <input type="checkbox" id="setAutoplay" />
+            </label>
+            <label class="settings-row">
+              <span>打开程序自动播放</span>
+              <input type="checkbox" id="setAutoplayLaunch" />
+            </label>
+          </section>
+
+          <section class="settings-group">
+            <h3>歌词</h3>
+            <label class="settings-row">
+              <span>本地无歌词时联网搜索</span>
+              <input type="checkbox" id="setOnlineLyrics" checked />
+            </label>
+            <label class="settings-row">
+              <span>网络歌词来源</span>
+              <select id="setLyricsSource">
+                <option value="auto">自动（网易 → QQ）</option>
+                <option value="netease">网易云</option>
+                <option value="qq">QQ 音乐</option>
+              </select>
+            </label>
+            <label class="settings-row">
+              <span>歌词时间偏移</span>
+              <div class="settings-range">
+                <input type="range" id="setLyricOffset" min="-2000" max="2000" step="50" />
+                <span class="mono dim" id="setLyricOffsetVal">0ms</span>
+              </div>
+            </label>
+            <label class="settings-row">
+              <span>歌词字号</span>
+              <div class="settings-range">
+                <input type="range" id="setLyricSize" min="12" max="50" step="1" />
+                <span class="mono dim" id="setLyricSizeVal">16px</span>
+              </div>
+            </label>
+            <label class="settings-row">
+              <span>当前歌词颜色</span>
+              <div class="settings-range">
+                <input type="color" id="setLyricColor" />
+                <span class="mono dim" id="setLyricColorVal">#3DDBD9</span>
+              </div>
+            </label>
+          </section>
+
+          <section class="settings-group">
+            <h3>界面</h3>
+            <label class="settings-row">
+              <span>显示右侧仪表栏</span>
+              <input type="checkbox" id="setShowDeck" checked />
+            </label>
+            <label class="settings-row">
+              <span>状态栏副标题</span>
+              <input type="text" id="setSubtitle" maxlength="24" />
+            </label>
+          </section>
+
+          <section class="settings-group">
+            <h3>关于</h3>
+            <div class="settings-about">
+              <div>JT Player 静听 · 本地 HiFi 播放器</div>
+              <div class="mono dim">版本 0.1.0 · Electron</div>
+              <div class="mono dim">支持 MP3 / WAV / FLAC / OGG / M4A / AAC / Opus</div>
+              <div class="dim">播放列表与设置会保存到本机，下次启动自动恢复</div>
+              <div class="dim">网络歌词：本地无 LRC/内嵌歌词时，可搜索网易云 / QQ 音乐</div>
+              <div class="dim">歌词默认缓存在系统临时目录 JTPlayer-lyrics 文件夹</div>
+              <div class="mono dim" id="statePathHint">状态文件：读取中…</div>
+              <div class="mono dim" id="lyricsCachePathHint">歌词缓存：—</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="settings-foot">
+          <button type="button" class="btn" id="btnResetSettings">恢复默认</button>
+          <button type="button" class="btn" id="btnCloseSettingsFoot">完成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Equalizer -->
+    <div class="settings-overlay" id="eqOverlay" hidden>
+      <div class="settings-panel eq-panel" role="dialog" aria-labelledby="eqTitle">
+        <div class="settings-head">
+          <h2 id="eqTitle">均衡器 · JT Player</h2>
+          <button type="button" class="icon-btn" id="btnCloseEq" title="关闭" aria-label="关闭均衡器">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.4 5l5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+          </button>
+        </div>
+        <div class="settings-body">
+          <section class="settings-group">
+            <div class="eq-toolbar">
+              <label class="eq-power">
+                <input type="checkbox" id="eqEnabled" />
+                <span>启用 EQ</span>
+              </label>
+              <select id="eqPresetSelect">
+                <option value="FLAT">FLAT 平坦</option>
+                <option value="VOCAL">VOCAL 人声</option>
+                <option value="CLASSIC">CLASSIC 古典</option>
+                <option value="JAZZ">JAZZ 爵士</option>
+                <option value="ROCK">ROCK 摇滚</option>
+                <option value="HEADPHONE">HEADPHONE 耳机</option>
+                <option value="CUSTOM">CUSTOM 自定义</option>
+              </select>
+              <button type="button" class="btn" id="btnEqReset">重置</button>
+            </div>
+            <div class="eq-bands" id="eqBands"></div>
+            <div class="eq-status mono dim" id="eqStatus">EQ: OFF · FLAT</div>
+          </section>
+        </div>
+        <div class="settings-foot">
+          <button type="button" class="btn" id="btnCloseEqFoot">完成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm dialog -->
+    <div class="settings-overlay" id="confirmOverlay" hidden>
+      <div class="settings-panel confirm-panel" role="dialog" aria-labelledby="confirmTitle" aria-modal="true">
+        <div class="settings-head">
+          <h2 id="confirmTitle">确认操作</h2>
+        </div>
+        <div class="settings-body">
+          <div class="confirm-body" id="confirmMessage">确定要清空播放列表吗？</div>
+        </div>
+        <div class="settings-foot">
+          <button type="button" class="btn" id="btnConfirmCancel">取消</button>
+          <button type="button" class="btn danger" id="btnConfirmOk">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="shell">
+      <!-- LEFT: playlist -->
+      <aside class="panel playlist-panel">
+        <div class="now-card" id="nowCard">
+          <div class="now-cover-wrap">
+            <img id="nowCover" alt="" />
+            <div class="now-cover-fallback" id="nowCoverFallback">JT</div>
+          </div>
+          <div class="now-meta">
+            <div class="now-title" id="nowTitle">未选择曲目</div>
+            <div class="now-artist" id="nowArtist">—</div>
+            <div class="badge-row" id="nowBadges"></div>
+          </div>
+        </div>
+
+        <div class="table-head">
+          <span>#</span>
+          <span>歌名</span>
+          <span>歌手</span>
+          <span class="ta-r">时长</span>
+        </div>
+        <div class="playlist" id="playlist" role="listbox" aria-label="播放列表"></div>
+
+        <div class="playlist-search" id="playlistSearchBar" hidden>
+          <input type="search" id="playlistSearchInput" placeholder="搜索歌名 / 歌手…" autocomplete="off" />
+          <button type="button" class="btn small" id="btnSearchClear" title="清空搜索">清除</button>
+        </div>
+
+        <div class="playlist-foot">
+          <span class="mono dim">曲目 <strong id="trackCount" class="accent">0</strong><span id="searchHint" class="search-hint"></span></span>
+          <div class="foot-actions">
+            <button type="button" class="btn" id="btnSearch" title="搜索定位歌曲">搜索</button>
+            <button type="button" class="btn" id="btnAddFiles" title="打开音频文件">添加</button>
+            <button type="button" class="btn" id="btnAddFolder" title="打开文件夹">文件夹</button>
+            <button type="button" class="btn" id="btnClear">清空</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER -->
+      <section class="stage">
+        <div class="stage-visual" id="stageVisual">
+          <img id="stageCover" alt="" />
+          <div class="stage-scrim"></div>
+          <div class="lyrics" id="lyrics">
+            <div class="lyric-scroll" id="lyricScroll">
+              <div class="lyric-line dim">静静聆听</div>
+              <div class="lyric-line active">本地曲库 · 高保真回放</div>
+              <div class="lyric-line dim">选择文件或文件夹开始</div>
+            </div>
+            <div class="lyric-badge mono" id="lyricBadge">无歌词</div>
+          </div>
+          <div class="stage-chip mono" id="stageChip">LASER STANDBY</div>
+        </div>
+
+        <div class="vu-block">
+          <div class="vu-head">
+            <span class="label-signal">POWER · DUAL VU METERS</span>
+            <span class="mono dim">HI-RES · BALLISTIC</span>
+          </div>
+          <div class="vu-row">
+            <span class="vu-ch">L</span>
+            <div class="vu-track"><div class="vu-fill" id="vuL"></div></div>
+            <span class="vu-db mono" id="vuLDb">-∞</span>
+          </div>
+          <div class="vu-row">
+            <span class="vu-ch">R</span>
+            <div class="vu-track"><div class="vu-fill" id="vuR"></div></div>
+            <span class="vu-db mono" id="vuRDb">-∞</span>
+          </div>
+          <div class="vu-scale mono">
+            <span>-40</span><span>-30</span><span>-20</span><span>-14</span><span>-10</span><span>-7</span><span>-3</span><span>0</span>
+          </div>
+        </div>
+
+        <div class="wave-block">
+          <div class="wave-times mono">
+            <span id="timeCurrent">00:00</span>
+            <span id="timeTotal">00:00</span>
+          </div>
+          <div class="wave-hit" id="waveHit" title="点击或拖拽定位">
+            <canvas id="waveCanvas" height="72"></canvas>
+            <div class="wave-scrub-line" id="waveScrubLine" hidden></div>
+            <div class="wave-hint mono">点击 / 拖拽定位</div>
+          </div>
+          <input type="range" id="seekBar" min="0" max="1000" value="0" aria-label="播放进度" />
+        </div>
+      </section>
+
+      <!-- RIGHT: equipment -->
+      <aside class="panel deck-panel">
+        <div class="deck-section">
+          <div class="deck-head">
+            <span class="label-signal"><span class="dot"></span> CD-CHAMBER / MASTER</span>
+            <span class="mono dim">LASER READING</span>
+          </div>
+          <div class="cd-chamber">
+            <div class="cd-disc" id="cdDisc">
+              <div class="cd-surface"></div>
+              <div class="cd-label" id="cdLabel">JT</div>
+              <div class="cd-hole"></div>
+            </div>
+            <div class="cd-art">
+              <img id="cdCover" alt="" />
+              <div class="cd-art-fallback mono" id="cdArtFallback">COVER</div>
+            </div>
+          </div>
+          <div class="format-strip mono" id="formatStrip">
+            <span>AUDIO</span><span>—</span><span>—</span><span>—</span>
+          </div>
+        </div>
+
+        <div class="deck-section">
+          <div class="deck-head">
+            <span class="label-gold"><span class="dot gold"></span> AUDIO METADATA</span>
+            <span class="mono dim">MASTER</span>
+          </div>
+          <div class="meta-grid" id="metaGrid">
+            <div class="meta-item">
+              <div class="meta-k">曲目名称</div>
+              <div class="meta-v" data-meta="title">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">主要歌手</div>
+              <div class="meta-v" data-meta="artist">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">所属专辑</div>
+              <div class="meta-v" data-meta="album">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">音频编码</div>
+              <div class="meta-v signal" data-meta="codec">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">采样频率</div>
+              <div class="meta-v gold" data-meta="sampleRate">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">码率 / 位深</div>
+              <div class="meta-v signal" data-meta="bitrate">—</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">播放设备</div>
+              <div class="meta-v" data-meta="device">系统默认</div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-k">音质标记</div>
+              <div class="meta-v" data-meta="quality">—</div>
+            </div>
+          </div>
+          <div class="dsp-line mono dim" id="dspLine">DSP: 32-BIT FLOAT · 待机</div>
+        </div>
+
+        <div class="deck-section">
+          <div class="deck-head">
+            <span class="label-signal"><span class="dot"></span> DUAL ANALOG VU</span>
+            <span class="mono dim">L / R STEREO</span>
+          </div>
+          <div class="analog-vus">
+            <div class="analog-vu">
+              <svg viewBox="0 0 160 100" class="vu-svg">
+                <defs>
+                  <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#3DDBD9"/>
+                    <stop offset="70%" stop-color="#D4A84B"/>
+                    <stop offset="100%" stop-color="#D42B3A"/>
+                  </linearGradient>
+                </defs>
+                <path d="M20 78 A 60 60 0 0 1 140 78" fill="none" stroke="#2A2E38" stroke-width="8"/>
+                <path d="M20 78 A 60 60 0 0 1 140 78" fill="none" stroke="url(#arcGrad)" stroke-width="2"/>
+                <text x="20" y="90" class="vu-tick">-20</text>
+                <text x="72" y="28" class="vu-tick">-3</text>
+                <text x="128" y="90" class="vu-tick">0</text>
+                <text x="80" y="72" class="vu-brand">DYVA AUDIO</text>
+                <text x="80" y="88" class="vu-ch-label" id="analogChL">CH-L</text>
+                <line id="needleL" x1="80" y1="78" x2="80" y2="28" stroke="#ECEAE6" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="80" cy="78" r="3" fill="#ECEAE6"/>
+              </svg>
+            </div>
+            <div class="analog-vu">
+              <svg viewBox="0 0 160 100" class="vu-svg">
+                <defs>
+                  <linearGradient id="arcGrad2" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#3DDBD9"/>
+                    <stop offset="70%" stop-color="#D4A84B"/>
+                    <stop offset="100%" stop-color="#D42B3A"/>
+                  </linearGradient>
+                </defs>
+                <path d="M20 78 A 60 60 0 0 1 140 78" fill="none" stroke="#2A2E38" stroke-width="8"/>
+                <path d="M20 78 A 60 60 0 0 1 140 78" fill="none" stroke="url(#arcGrad2)" stroke-width="2"/>
+                <text x="20" y="90" class="vu-tick">-20</text>
+                <text x="72" y="28" class="vu-tick">-3</text>
+                <text x="128" y="90" class="vu-tick">0</text>
+                <text x="80" y="72" class="vu-brand">DYVA AUDIO</text>
+                <text x="80" y="88" class="vu-ch-label" id="analogChR">CH-R</text>
+                <line id="needleR" x1="80" y1="78" x2="80" y2="28" stroke="#ECEAE6" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="80" cy="78" r="3" fill="#ECEAE6"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="deck-section grow">
+          <div class="deck-head">
+            <span class="label-signal"><span class="dot"></span> RTA-3100 / FFT SPECTRUM</span>
+            <span class="mono dim">32-BAND · 20HZ–20KHZ</span>
+          </div>
+          <canvas id="rtaCanvas" class="rta-canvas"></canvas>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Transport -->
+    <footer class="transport">
+      <div class="transport-center">
+        <div class="dsp-block">
+          <button type="button" class="btn small" id="btnDsp" title="DSP 预设">DSP预设</button>
+          <button type="button" class="btn small" id="btnEq" title="均衡器">均衡器</button>
+        </div>
+
+        <div class="track-readout mono">
+          <span class="dim">TRACK</span>
+          <strong id="trackIndex">00</strong>
+          <span class="dim">/</span>
+          <span id="trackTotal">00</span>
+          <span class="sep"></span>
+          <span class="big-time" id="transportTime">00:00</span>
+          <span class="sep"></span>
+          <span id="transportRate" class="signal">—</span>
+          <span id="transportFmt" class="gold">—</span>
+        </div>
+
+        <div class="transport-btns">
+          <button type="button" class="icon-btn" id="btnPrev" title="上一首" aria-label="上一首">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3 6l9-6v12l-9-6z"/></svg>
+          </button>
+          <button type="button" class="icon-btn primary" id="btnPlay" title="播放/暂停" aria-label="播放或暂停">
+            <svg class="icon-play" id="iconPlay" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
+            <svg class="icon-pause" id="iconPause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="btnNext" title="下一首" aria-label="下一首">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l9-6-9-6v12z"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="btnRepeat" title="循环模式" aria-label="循环模式" data-mode="all">
+            <svg class="icon-repeat-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 7h10v3l3-3-3-3v3H7a3 3 0 00-3 3v1"/><path d="M17 17H7v-3l-3 3 3 3v-3h10a3 3 0 003-3v-1"/></svg>
+            <svg class="icon-repeat-one" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M7 7h8v2.5"/><path d="M7 17h10a3 3 0 003-3v-1"/><path d="M7 7a3 3 0 00-3 3v1"/><path d="M17 17l2.5 2.5L22 17"/><text x="11.2" y="15.2" text-anchor="middle" fill="currentColor" stroke="none" font-family="Segoe UI, sans-serif" font-size="9" font-weight="700">1</text></svg>
+            <svg class="icon-repeat-shuffle" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3.5c1.2 0 2.3.6 3 1.6L13 13c.7 1 1.8 1.6 3 1.6H20"/><path d="M4 17h3.5c1.2 0 2.3-.6 3-1.6L12 12"/><path d="M14.5 10.4L17 7.9c.7-1 1.8-1.6 3-1.6H20"/><path d="M18 4l2 2-2 2"/><path d="M18 14l2 2-2 2"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="vol-block">
+        <span class="label-signal">VOLUME</span>
+        <div class="vol-row">
+          <button type="button" class="icon-btn" id="btnMute" title="静音" aria-label="静音">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10v4h3l5 4V6L7 10H4z"/><path d="M16 9a4 4 0 010 6"/><path d="M18.5 7a7 7 0 010 10"/></svg>
+          </button>
+          <input type="range" id="volumeBar" min="0" max="100" value="85" aria-label="音量" />
+          <span class="mono vol-val" id="volVal">85</span>
+        </div>
+      </div>
+    </footer>
+
+    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.opus,.webm,.mp4" multiple hidden />
+
+    <div class="playlist-menu" id="playlistMenu" hidden>
+      <button type="button" data-action="play">播放此曲</button>
+      <button type="button" data-action="remove">从列表删除</button>
+      <button type="button" data-action="clear">清空列表</button>
+    </div>
+  </div>
+
+  <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
