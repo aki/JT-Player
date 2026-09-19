@@ -856,6 +856,53 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
 }
 .lyric-badge.dim { color: var(--muted); }
 
+.lyric-badge {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+.lyric-badge:hover {
+  color: #fff;
+  border-color: var(--signal);
+}
+
+.lyrics-menu {
+  pointer-events: auto !important;
+}
+
+.lyrics-menu {
+  position: absolute;
+  left: 12px;
+  bottom: 42px;
+  z-index: 20;
+  min-width: 180px;
+  padding: 4px;
+  background: #12141A;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.lyrics-menu[hidden] { display: none !important; }
+
+.lyrics-menu button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 12px;
+  padding: 8px 10px;
+  cursor: default;
+}
+
+.lyrics-menu button:hover {
+  background: rgba(61, 219, 217, 0.12);
+  color: var(--signal);
+}
+
 .wave-times {
   display: flex;
   justify-content: space-between;

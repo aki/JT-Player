@@ -207,6 +207,107 @@ async function searchQqLyrics(title, artist) {
   };
 }
 
+function clearLyricsCacheFor(title, artist, path) {
+  const dir = getLyricsCacheDir();
+  const keys = new Set();
+  if (title || artist) keys.add(lyricsCacheKey(artist, title));
+  if (path) {
+    const base = path.parse ? path.parse(path).name : require('path').parse(path).name;
+    keys.add(lyricsCacheKey('', base));
+    keys.add(lyricsCacheKey(artist || '', base));
+  }
+  let removed = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.lrc')) continue;
+      const name = f.replace(/\.lrc$/i, '');
+      if (keys.has(name)) {
+        try { fs.unlinkSync(path.join(dir, f)); removed += 1; } catch { /* ignore */ }
+      }
+      // 宽松：文件名包含曲名
+      if (title && name.includes(String(title).slice(0, 8))) {
+        try { fs.unlinkSync(path.join(dir, f)); removed += 1; } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+  return { ok: true, removed };
+}
+
+/** 返回多条候选歌词（当前仅网易多结果；QQ 取最优一条） */
+async function searchOnlineLyricsCandidates({ title, artist, source = 'auto', limit = 5 }) {
+  const keyword = [title, artist].filter(Boolean).join(' ').trim();
+  if (!keyword) return { ok: false, error: '缺少歌名', candidates: [] };
+
+  const candidates = [];
+  const headers = {
+    Referer: 'https://music.163.com/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    Cookie: 'appver=2.0.2; os=pc;',
+    Accept: 'application/json,text/plain,*/*',
+  };
+
+  if (source === 'auto' || source === 'netease') {
+    try {
+      const searchUrl =
+        'https://music.163.com/api/search/get/web?s=' +
+        encodeURIComponent(keyword) +
+        '&type=1&offset=0&total=true&limit=8';
+      const searchRes = await httpGet(searchUrl, headers);
+      const searchJson = safeJson(searchRes.body);
+      const songs = (searchJson?.result?.songs || []).slice(0, limit);
+      const t = String(title || '').toLowerCase();
+      const a = String(artist || '').toLowerCase();
+      const ranked = songs.map((s, i) => {
+        const st = String(s.name || '').toLowerCase();
+        const sa = (s.artists || s.ar || []).map((x) => x.name).join(' ').toLowerCase();
+        let score = 10 - i;
+        if (t && st.includes(t)) score += 20;
+        if (a && sa && sa.includes(a)) score += 15;
+        return { song: s, score };
+      }).sort((x, y) => y.score - x.score);
+
+      for (const { song } of ranked) {
+        if (candidates.length >= limit) break;
+        try {
+          const lyricUrl = `https://music.163.com/api/song/lyric?id=${song.id}&lv=1&kv=1&tv=-1`;
+          const lyricRes = await httpGet(lyricUrl, headers);
+          const lyricJson = safeJson(lyricRes.body);
+          const lrc = lyricJson?.lrc?.lyric || '';
+          if (!lrc || lrc.trim().length < 8) continue;
+          candidates.push({
+            source: 'netease',
+            title: song.name || title,
+            artist: (song.artists || song.ar || []).map((x) => x.name).join(' / ') || artist,
+            id: song.id,
+            lyrics: lrc.replace(/\n{3,}/g, '\n\n').trim(),
+          });
+        } catch { /* next */ }
+      }
+    } catch { /* ignore */ }
+  }
+
+  if ((source === 'auto' || source === 'qq') && candidates.length < limit) {
+    try {
+      const qq = await searchQqLyrics(title, artist);
+      if (qq?.lyrics) {
+        candidates.push({
+          source: 'qq',
+          title: qq.title || title,
+          artist: qq.artist || artist,
+          id: qq.id,
+          lyrics: qq.lyrics,
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  return {
+    ok: candidates.length > 0,
+    candidates,
+    error: candidates.length ? null : '未找到歌词',
+  };
+}
+
 async function searchOnlineLyrics({ title, artist, source = 'auto', useCache = true }) {
   if (useCache) {
     const cached = readLyricsCache(artist, title);
@@ -229,7 +330,6 @@ async function searchOnlineLyrics({ title, artist, source = 'auto', useCache = t
         : await searchQqLyrics(title, artist);
       if (hit?.lyrics) {
         writeLyricsCache(hit.artist || artist, hit.title || title, hit.lyrics, hit.source);
-        // 也按请求参数再缓存一份，方便下次同名命中
         writeLyricsCache(artist, title, hit.lyrics, hit.source);
         return {
           ok: true,
@@ -501,6 +601,22 @@ ipcMain.handle('state:path', async () => getStateFile());
 ipcMain.handle('lyrics:searchOnline', async (_e, payload) => {
   try {
     return await searchOnlineLyrics(payload || {});
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('lyrics:searchCandidates', async (_e, payload) => {
+  try {
+    return await searchOnlineLyricsCandidates(payload || {});
+  } catch (err) {
+    return { ok: false, candidates: [], error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('lyrics:clearCache', async (_e, payload) => {
+  try {
+    return clearLyricsCacheFor(payload?.title, payload?.artist, payload?.path);
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }

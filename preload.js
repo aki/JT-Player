@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('jt', {
   saveState: (state) => ipcRenderer.invoke('state:save', state),
   getStatePath: () => ipcRenderer.invoke('state:path'),
   searchOnlineLyrics: (payload) => ipcRenderer.invoke('lyrics:searchOnline', payload),
+  searchLyricCandidates: (payload) => ipcRenderer.invoke('lyrics:searchCandidates', payload),
+  clearLyricsCache: (payload) => ipcRenderer.invoke('lyrics:clearCache', payload),
   lyricsCachePath: () => ipcRenderer.invoke('lyrics:cachePath'),
   getPathForFile: (file) => {
     try {

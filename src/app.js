@@ -30,6 +30,7 @@ const dom = {
   transportTime: el('transportTime'),
   lyricScroll: el('lyricScroll'),
   lyricBadge: el('lyricBadge'),
+  lyricsMenu: el('lyricsMenu'),
   transportRate: el('transportRate'),
   transportFmt: el('transportFmt'),
   trackIndex: el('trackIndex'),
@@ -1045,6 +1046,177 @@ async function fetchOnlineLyrics(track, trackId) {
     }
     return null;
   }
+}
+
+function currentTrackForLyrics() {
+  return state.index >= 0 ? state.tracks[state.index] : null;
+}
+
+function lyricsRequestPayload(track) {
+  const meta = track?.meta || {};
+  return {
+    title: meta.title || track?.name || '',
+    artist: meta.artist === '未知艺术家' ? '' : (meta.artist || ''),
+    path: track?.path || '',
+  };
+}
+
+function hideLyricsMenu() {
+  if (dom.lyricsMenu) dom.lyricsMenu.hidden = true;
+}
+
+function showLyricsMenu() {
+  if (!dom.lyricsMenu) return;
+  const track = currentTrackForLyrics();
+  const hasTrack = !!track;
+  dom.lyricsMenu.querySelectorAll('button[data-lact]').forEach((btn) => {
+    const act = btn.getAttribute('data-lact');
+    btn.disabled = !hasTrack && act !== 'folder' && act !== 'toggle-online';
+  });
+  const toggle = dom.lyricsMenu.querySelector('[data-lact="toggle-online"]');
+  if (toggle) toggle.textContent = state.onlineLyrics === false ? '恢复联网搜索' : '暂停联网搜索';
+  dom.lyricsMenu.hidden = false;
+}
+
+async function refreshCurrentLyrics({ ignoreCache = true, clearCacheFirst = false } = {}) {
+  const track = currentTrackForLyrics();
+  if (!track) return;
+  const trackId = track.id;
+  const payload = lyricsRequestPayload(track);
+
+  if (clearCacheFirst && hasDesktop && window.jt.clearLyricsCache) {
+    try { await window.jt.clearLyricsCache(payload); } catch { /* ignore */ }
+  }
+
+  if (hasDesktop && track.path && window.jt.findLrc) {
+    try {
+      const lrc = await window.jt.findLrc(track.path);
+      if (lrc?.text && !clearCacheFirst) {
+        applyLyricsPayload(trackId, lrc.text, 'lrc');
+        return;
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!hasDesktop || !window.jt.searchOnlineLyrics) {
+    if (track.meta?.lyrics) applyLyricsPayload(trackId, track.meta.lyrics, track.meta.lyricsSource || 'embedded');
+    else setLyricsFallback(track);
+    return;
+  }
+
+  const settings = loadSettings();
+  state.lyrics.trackId = trackId;
+  const res = await window.jt.searchOnlineLyrics({
+    title: payload.title,
+    artist: payload.artist,
+    source: settings.lyricsSource || state.lyricsSource || 'auto',
+    useCache: !ignoreCache,
+  });
+  if (state.lyrics.trackId !== trackId) return;
+  if (res?.ok && res.lyrics) {
+    applyLyricsPayload(trackId, res.lyrics, res.cached ? 'online-cache' : `online-${res.source}`);
+  } else if (track.meta?.lyrics) {
+    applyLyricsPayload(trackId, track.meta.lyrics, track.meta.lyricsSource || 'embedded');
+  } else {
+    setLyricsFallback(track);
+  }
+}
+
+let lyricCandidateIdx = 0;
+let lyricCandidatesCache = [];
+
+async function switchToNextLyricCandidate() {
+  const track = currentTrackForLyrics();
+  if (!track || !hasDesktop || !window.jt.searchLyricCandidates) {
+    await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: true });
+    return;
+  }
+  const trackId = track.id;
+  const payload = lyricsRequestPayload(track);
+  if (dom.lyricBadge) {
+    dom.lyricBadge.textContent = '获取候选歌词…';
+    dom.lyricBadge.className = 'lyric-badge mono';
+  }
+  const settings = loadSettings();
+  const res = await window.jt.searchLyricCandidates({
+    title: payload.title,
+    artist: payload.artist,
+    source: settings.lyricsSource || 'auto',
+    limit: 6,
+  });
+  if (state.lyrics.trackId !== trackId) return;
+  const list = res?.candidates || [];
+  if (!list.length) {
+    await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: true });
+    return;
+  }
+  lyricCandidatesCache = list;
+  lyricCandidateIdx = (lyricCandidateIdx + 1) % list.length;
+  const pick = list[lyricCandidateIdx];
+  if (hasDesktop && window.jt.clearLyricsCache) {
+    try { await window.jt.clearLyricsCache(payload); } catch { /* ignore */ }
+  }
+  applyLyricsPayload(trackId, pick.lyrics, `online-${pick.source}`);
+  if (dom.lyricBadge) {
+    dom.lyricBadge.textContent = `候选 ${lyricCandidateIdx + 1}/${list.length} · ${pick.source}`;
+  }
+}
+
+if (dom.lyricBadge) {
+  dom.lyricBadge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (dom.lyricsMenu && !dom.lyricsMenu.hidden) hideLyricsMenu();
+    else showLyricsMenu();
+  });
+}
+
+if (dom.lyricsMenu) {
+  dom.lyricsMenu.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-lact]');
+    if (!btn || btn.disabled) return;
+    const act = btn.getAttribute('data-lact');
+    hideLyricsMenu();
+    const track = currentTrackForLyrics();
+    if (act === 'refresh') {
+      await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: true });
+    } else if (act === 'next') {
+      lyricCandidateIdx = 0;
+      await switchToNextLyricCandidate();
+    } else if (act === 'clear') {
+      if (track && hasDesktop && window.jt.clearLyricsCache) {
+        await window.jt.clearLyricsCache(lyricsRequestPayload(track));
+      }
+      await refreshCurrentLyrics({ ignoreCache: true, clearCacheFirst: false });
+    } else if (act === 'toggle-online') {
+      state.onlineLyrics = state.onlineLyrics === false;
+      saveSettings({ onlineLyrics: state.onlineLyrics });
+      if (dom.setOnlineLyrics) dom.setOnlineLyrics.checked = state.onlineLyrics !== false;
+      if (!state.onlineLyrics && dom.lyricBadge) {
+        dom.lyricBadge.textContent = '已暂停联网歌词';
+        dom.lyricBadge.className = 'lyric-badge mono dim';
+      }
+    } else if (act === 'folder') {
+      if (hasDesktop && window.jt.lyricsCachePath) {
+        const p = await window.jt.lyricsCachePath();
+        if (p && dom.lyricBadge) {
+          dom.lyricBadge.textContent = `缓存：${p}`;
+        }
+      }
+    }
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (!dom.lyricsMenu || dom.lyricsMenu.hidden) return;
+  if (e.target.closest('#lyricsMenu') || e.target.closest('#lyricBadge')) return;
+  hideLyricsMenu();
+});
+
+if (dom.stageVisual) {
+  dom.stageVisual.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showLyricsMenu();
+  });
 }
 
 async function loadTrackLyrics(track) {

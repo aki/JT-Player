@@ -235,7 +235,14 @@
               <div class="lyric-line active">本地曲库 · 高保真回放</div>
               <div class="lyric-line dim">选择文件或文件夹开始</div>
             </div>
-            <div class="lyric-badge mono" id="lyricBadge">无歌词</div>
+            <div class="lyric-badge mono" id="lyricBadge" title="点击处理错误歌词">无歌词</div>
+            <div class="lyrics-menu" id="lyricsMenu" hidden>
+              <button type="button" data-lact="refresh">重新搜索（忽略缓存）</button>
+              <button type="button" data-lact="next">换一条网络歌词</button>
+              <button type="button" data-lact="clear">清除本曲缓存</button>
+              <button type="button" data-lact="toggle-online">暂停联网搜索</button>
+              <button type="button" data-lact="folder">打开歌词缓存目录</button>
+            </div>
           </div>
           <div class="stage-chip mono" id="stageChip">LASER STANDBY</div>
         </div>
