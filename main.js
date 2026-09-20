@@ -486,7 +486,9 @@ async function walkAudioFiles(dir, acc = [], depth = 0) {
   return acc;
 }
 
-async function readMetadata(filePath) {
+async function readMetadata(filePath, options = {}) {
+  const includeCover = !!options.includeCover;
+  const includeLyrics = options.includeLyrics !== false;
   const fallback = {
     title: path.parse(filePath).name,
     artist: '未知艺术家',
@@ -503,12 +505,16 @@ async function readMetadata(filePath) {
 
   try {
     const mm = await import('music-metadata');
-    const meta = await mm.parseFile(filePath, { duration: true });
+    // 批量读列表时跳过封面，避免几十上百张专辑图占内存
+    const meta = await mm.parseFile(filePath, {
+      duration: true,
+      skipCovers: !includeCover,
+    });
     const common = meta.common || {};
     const format = meta.format || {};
 
     let cover = null;
-    if (common.picture && common.picture[0]) {
+    if (includeCover && common.picture && common.picture[0]) {
       const pic = common.picture[0];
       const buf = Buffer.from(pic.data);
       const mime = pic.format || 'image/jpeg';
@@ -520,12 +526,14 @@ async function readMetadata(filePath) {
       /flac|wav|aiff?/i.test(path.extname(filePath).toLowerCase());
 
     let lyrics = null;
-    if (Array.isArray(common.lyrics) && common.lyrics.length) {
-      const hit = common.lyrics.find((x) => x && (x.text || x.lyrics)) ||
-        common.lyrics[0];
-      lyrics = String(hit?.text || hit?.lyrics || '').trim() || null;
-    } else if (typeof common.lyrics === 'string' && common.lyrics.trim()) {
-      lyrics = common.lyrics.trim();
+    if (includeLyrics) {
+      if (Array.isArray(common.lyrics) && common.lyrics.length) {
+        const hit = common.lyrics.find((x) => x && (x.text || x.lyrics)) ||
+          common.lyrics[0];
+        lyrics = String(hit?.text || hit?.lyrics || '').trim() || null;
+      } else if (typeof common.lyrics === 'string' && common.lyrics.trim()) {
+        lyrics = common.lyrics.trim();
+      }
     }
 
     return {
@@ -592,11 +600,11 @@ ipcMain.handle('dialog:openFolder', async () => {
   return walkAudioFiles(result.filePaths[0]);
 });
 
-ipcMain.handle('meta:read', async (_e, filePath) => {
+ipcMain.handle('meta:read', async (_e, filePath, options) => {
   if (!filePath || !fs.existsSync(filePath)) {
     return { ok: false, error: '文件不存在' };
   }
-  const data = await readMetadata(filePath);
+  const data = await readMetadata(filePath, options || {});
   const lrc = await readSidecarLrc(filePath);
   if (lrc?.text) {
     data.lyrics = data.lyrics || lrc.text;
@@ -606,6 +614,16 @@ ipcMain.handle('meta:read', async (_e, filePath) => {
     data.lyricsSource = 'embedded';
   }
   return { ok: true, data, path: filePath, url: pathToFileURL(filePath).href };
+});
+
+ipcMain.handle('meta:cover', async (_e, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const data = await readMetadata(filePath, { includeCover: true, includeLyrics: false });
+    return data.cover || null;
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('fs:readText', async (_e, filePath) => {

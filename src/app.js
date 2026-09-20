@@ -1,7 +1,8 @@
 /* JT Player 静听 — renderer */
 
 const AUDIO_EXT = /\.(mp3|wav|flac|ogg|oga|m4a|aac|webm|opus|mp4|aiff|aif)$/i;
-const DECODE_MAX_BYTES = 80 * 1024 * 1024;
+const DECODE_MAX_BYTES = 24 * 1024 * 1024; // 波形解码上限，降低内存
+const COVER_MAX_BYTES_ESTIMATE = 0; // 仅当前曲加载封面
 
 const el = (id) => document.getElementById(id);
 
@@ -1410,10 +1411,9 @@ function renderLyricsView(resetScroll = false) {
   if (timed?.length) {
     const idx = Number.isInteger(state.lyrics.index) ? state.lyrics.index : -1;
     const box = dom.lyricScroll;
-
-    // 始终从第 0 句完整渲染，保证“从头开始显示”
+    // 单曲歌词量有限，从第 0 句渲染，保证开头可见
+    const limit = Math.min(timed.length, 400);
     let html = '';
-    const limit = Math.min(timed.length, 800);
     for (let i = 0; i < limit; i++) {
       const cls = i === idx ? 'lyric-line active' : 'lyric-line dim';
       html += `<div class="${cls}" data-lyric-index="${i}">${escapeHtml(timed[i].text)}</div>`;
@@ -1434,27 +1434,22 @@ function renderLyricsView(resetScroll = false) {
     }
 
     const active = idx >= 0 ? box.querySelector('.lyric-line.active') : null;
-
-    // 未开始 / 开头附近 / 强制刷新：停在最前，从第一句看起
     const nearStart = idx < 0 || idx <= 4;
     if (resetScroll || nearStart || !active) {
       box.scrollTop = 0;
       return;
     }
-
     const offset = active.offsetTop - box.clientHeight / 2 + active.clientHeight / 2;
     const target = Math.max(0, offset);
     if (resetScroll) box.scrollTop = target;
-    else {
-      const delta = Math.abs(box.scrollTop - target);
-      if (delta > 8) box.scrollTo({ top: target, behavior: 'smooth' });
+    else if (Math.abs(box.scrollTop - target) > 8) {
+      box.scrollTo({ top: target, behavior: 'smooth' });
     }
     return;
   }
 
   if (plain?.length) {
-    // 文本歌词同样从第一行开始
-    const shown = plain.slice(0, 200);
+    const shown = plain.slice(0, 80);
     dom.lyricScroll.innerHTML = shown
       .map((line, i) => `<div class="lyric-line ${i === 0 ? 'active' : 'dim'}">${escapeHtml(line)}</div>`)
       .join('');
@@ -1824,18 +1819,17 @@ function applySearchQuery(q) {
 
   let hit = locateSearchHit(0);
   if (hit < 0 && hasDesktop && window.jt.readMeta) {
-    // 标签可能还没读完：补齐元数据后再定位一次
     const pending = state.tracks.filter((t) => t && !t.meta && t.path && !t.unsupported);
-    pending.slice(0, 400).forEach((t) => {
-      enrichTrackFromDesktop(t).then(() => {
+    mapLimit(pending.slice(0, 300), 4, (t) => enrichTrackFromDesktop(t, { withCover: false }))
+      .then(() => {
         if (!state.searchQuery.trim()) return;
         if (getSearchHitIndices().length) {
           updateSearchHint();
           renderPlaylist();
           locateSearchHit(0);
         }
-      });
-    });
+      })
+      .catch(() => { /* ignore */ });
   }
 }
 
@@ -1978,8 +1972,8 @@ function updateNowUI() {
 
 async function extractPeaks(track) {
   if (!audioCtx) return null;
+  let buf = null;
   try {
-    let buf = null;
     if (hasDesktop && track.path && window.jt.readBuffer) {
       buf = await window.jt.readBuffer(track.path);
     } else if (track.url) {
@@ -1987,7 +1981,9 @@ async function extractPeaks(track) {
       buf = await res.arrayBuffer();
     }
     if (!buf || buf.byteLength > DECODE_MAX_BYTES) return null;
-    const audioBuf = await audioCtx.decodeAudioData(buf.slice ? buf.slice(0) : buf);
+    const copy = buf.slice ? buf.slice(0) : buf;
+    buf = null; // 允许回收原始缓冲
+    const audioBuf = await audioCtx.decodeAudioData(copy);
     const ch = audioBuf.getChannelData(0);
     const target = 480;
     const block = Math.max(1, Math.floor(ch.length / target));
@@ -1996,7 +1992,7 @@ async function extractPeaks(track) {
       let max = 0;
       const start = i * block;
       const end = Math.min(start + block, ch.length);
-      for (let j = start; j < end; j += 2) {
+      for (let j = start; j < end; j += 4) {
         const v = Math.abs(ch[j]);
         if (v > max) max = v;
       }
@@ -2005,6 +2001,50 @@ async function extractPeaks(track) {
     return peaks;
   } catch {
     return null;
+  }
+}
+
+/** 批量读列表：不带封面，限制并发 */
+async function mapLimit(list, limit, worker) {
+  const out = new Array(list.length);
+  let i = 0;
+  async function run() {
+    while (i < list.length) {
+      const idx = i++;
+      out[idx] = await worker(list[idx], idx);
+    }
+  }
+  const n = Math.max(1, Math.min(limit, list.length || 1));
+  await Promise.all(Array.from({ length: n }, run));
+  return out;
+}
+
+async function enrichTrackFromDesktop(track, options = {}) {
+  if (!hasDesktop || !track.path) return;
+  const wantCover = !!options.withCover;
+  if (!track.meta || !track.url || (wantCover && !track.meta.cover)) {
+    try {
+      const res = await window.jt.readMeta(track.path, {
+        includeCover: wantCover,
+        includeLyrics: options.withLyrics !== false,
+      });
+      if (res.ok) {
+        track.meta = { ...(track.meta || {}), ...res.data };
+        if (!res.data.cover && track.meta.cover && !wantCover) {
+          // 批量模式下不保留旧封面大图
+          delete track.meta.cover;
+        }
+        track.url = res.url;
+        if (res.data.duration) track.duration = res.data.duration;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (track.meta?.lyrics && state.tracks[state.index]?.id === track.id && !state.lyrics.timed && !state.lyrics.plain) {
+    applyLyricsPayload(track.id, track.meta.lyrics, track.meta.lyricsSource || 'embedded');
+  } else if (state.tracks[state.index]?.id === track.id && !state.lyrics.timed && !state.lyrics.plain) {
+    loadTrackLyrics(track);
   }
 }
 
@@ -2070,14 +2110,29 @@ async function loadTrack(i, autoplay = true, options = {}) {
 
   let src = track.url;
   if (!src && track.path && hasDesktop) {
-    const res = await window.jt.readMeta(track.path);
+    const res = await window.jt.readMeta(track.path, { includeCover: true });
     if (res.ok) {
       track.url = res.url;
-      track.meta = res.data;
+      track.meta = { ...(track.meta || {}), ...res.data };
       track.duration = res.data.duration || track.duration || 0;
       src = track.url;
       updateNowUI();
       renderPlaylist();
+    }
+  } else if (track.path && hasDesktop && track.meta && !track.meta.cover) {
+    // 已有其它元数据时，仅补封面
+    try {
+      if (window.jt.readCover) {
+        const cover = await window.jt.readCover(track.path);
+        if (cover) track.meta.cover = cover;
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 切歌后释放其它曲目的封面大图，只保留当前
+  for (const t of state.tracks) {
+    if (t !== track && t.meta && t.meta.cover) {
+      delete t.meta.cover;
     }
   }
 
@@ -2097,17 +2152,16 @@ async function loadTrack(i, autoplay = true, options = {}) {
   loadTrackLyrics(track);
 
   const trackId = track.id;
-  extractPeaks(track).then((peaks) => {
-    if (state.tracks[state.index]?.id === trackId) {
-      state.wavePeaks = peaks || syntheticPeaks(track.path || track.name || src);
-      drawWave();
-    }
-  }).catch(() => {
-    state.wavePeaks = syntheticPeaks(track.path || track.name || src);
-    drawWave();
-  });
-
-  if (!state.wavePeaks) state.wavePeaks = syntheticPeaks(track.path || track.name || src);
+  // 大文件不强制解码波形，避免占用数百 MB
+  state.wavePeaks = syntheticPeaks(track.path || track.name || src);
+  if ((track.duration || 0) * 2 * 2 < 20e6) {
+    extractPeaks(track).then((peaks) => {
+      if (state.tracks[state.index]?.id === trackId && peaks) {
+        state.wavePeaks = peaks;
+        drawWave();
+      }
+    }).catch(() => { /* keep synthetic */ });
+  }
 
   // 元数据就绪后再定位，避免从头播
   const ready = await waitAudioReady(5000);
@@ -2186,27 +2240,6 @@ function togglePlay() {
   } else {
     audio.pause();
     setEngine(false);
-  }
-}
-
-async function enrichTrackFromDesktop(track) {
-  if (!hasDesktop || !track.path) return;
-  if (!track.meta || !track.url) {
-    try {
-      const res = await window.jt.readMeta(track.path);
-      if (res.ok) {
-        track.meta = { ...track.meta, ...res.data };
-        track.url = res.url;
-        if (res.data.duration) track.duration = res.data.duration;
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  if (track.meta?.lyrics && state.tracks[state.index]?.id === track.id && !state.lyrics.timed && !state.lyrics.plain) {
-    applyLyricsPayload(track.id, track.meta.lyrics, track.meta.lyricsSource || 'embedded');
-  } else if (state.tracks[state.index]?.id === track.id && !state.lyrics.timed && !state.lyrics.plain) {
-    loadTrackLyrics(track);
   }
 }
 
@@ -2299,10 +2332,9 @@ async function addPaths(paths, options = {}) {
 
   persistAppState();
 
-  // enrich in background
-  const enrichAll = added.map(async (t) => {
-    if (t.unsupported) return t;
-    await enrichTrackFromDesktop(t);
+  // enrich in background：不加载封面，限制并发
+  const enrichAll = mapLimit(added, 4, async (t) => {
+    if (!t.unsupported) await enrichTrackFromDesktop(t, { withCover: false });
     return t;
   });
   Promise.all(enrichAll).then(() => {
@@ -2327,7 +2359,7 @@ async function addPaths(paths, options = {}) {
       firstPlayable = state.tracks.findIndex((t) => !t.unsupported);
     }
     if (firstPlayable >= 0) {
-      await enrichTrackFromDesktop(state.tracks[firstPlayable]);
+      await enrichTrackFromDesktop(state.tracks[firstPlayable], { withCover: true });
       playIndex(firstPlayable);
     }
   } else if (!wantAuto && options.selectFirst !== false && options.scrollToNew !== false) {

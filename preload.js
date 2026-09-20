@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('jt', {
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
   openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
-  readMeta: (filePath) => ipcRenderer.invoke('meta:read', filePath),
+  readMeta: (filePath, options) => ipcRenderer.invoke('meta:read', filePath, options),
+  readCover: (filePath) => ipcRenderer.invoke('meta:cover', filePath),
   fileExists: (filePath) => ipcRenderer.invoke('fs:exists', filePath),
   readBuffer: (filePath) => ipcRenderer.invoke('fs:readBuffer', filePath),
   readText: (filePath) => ipcRenderer.invoke('fs:readText', filePath),
