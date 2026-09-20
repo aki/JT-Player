@@ -8,6 +8,8 @@ const el = (id) => document.getElementById(id);
 
 const dom = {
   audio: el('audio'),
+  video: el('stageVideo'),
+  stageVisual: el('stageVisual'),
   playlist: el('playlist'),
   trackCount: el('trackCount'),
   nowTitle: el('nowTitle'),
@@ -129,6 +131,7 @@ const state = {
   resumePath: null,
   resumeTrackId: null,
   trackPositions: {},
+  videoMode: false,
   restoring: false,
   searchQuery: '',
   eqEnabled: false,
@@ -284,10 +287,10 @@ function pathKeyOf(p) {
 function currentPlaybackPosition() {
   const track = state.index >= 0 ? state.tracks[state.index] : null;
   if (!track) return 0;
-  if (audio.src && Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
-    // 快结束时不算进度，避免一打开就播完
-    if (!audio.duration || audio.currentTime < audio.duration - 1.5) {
-      return audio.currentTime;
+  const el = media();
+  if (el.src && Number.isFinite(el.currentTime) && el.currentTime > 0) {
+    if (!el.duration || el.currentTime < el.duration - 1.5) {
+      return el.currentTime;
     }
   }
   return Number(state.resumePosition) || 0;
@@ -363,7 +366,8 @@ function persistPlaybackProgress(force = false) {
 
 function waitAudioReady(timeout = 4000) {
   return new Promise((resolve) => {
-    if (audio.readyState >= 1 && audio.duration) {
+    const el = media();
+    if (el.readyState >= 1 && el.duration) {
       resolve(true);
       return;
     }
@@ -371,12 +375,12 @@ function waitAudioReady(timeout = 4000) {
     const done = () => {
       if (settled) return;
       settled = true;
-      audio.removeEventListener('loadedmetadata', done);
-      audio.removeEventListener('canplay', done);
-      resolve(!!audio.duration);
+      el.removeEventListener('loadedmetadata', done);
+      el.removeEventListener('canplay', done);
+      resolve(!!el.duration);
     };
-    audio.addEventListener('loadedmetadata', done);
-    audio.addEventListener('canplay', done);
+    el.addEventListener('loadedmetadata', done);
+    el.addEventListener('canplay', done);
     setTimeout(done, timeout);
   });
 }
@@ -385,10 +389,11 @@ async function seekToResumePosition(seconds) {
   const t = Number(seconds);
   if (!Number.isFinite(t) || t <= 0) return false;
   await waitAudioReady();
-  if (!audio.duration) return false;
-  const target = Math.min(Math.max(0, t), Math.max(0, audio.duration - 0.4));
+  const el = media();
+  if (!el.duration) return false;
+  const target = Math.min(Math.max(0, t), Math.max(0, el.duration - 0.4));
   try {
-    audio.currentTime = target;
+    el.currentTime = target;
     state.resumePosition = target;
     refreshPlayTimeDisplay(target);
     syncLyrics(target);
@@ -757,8 +762,30 @@ async function restoreAppStateInner() {
 }
 
 const audio = dom.audio;
+const video = dom.video;
+
+/** 当前媒体元素：视频用 <video>，其余用 <audio> */
+function media() {
+  return state.videoMode ? (video || audio) : audio;
+}
+
+function isVideoName(name = '') {
+  return /\.(mp4|m4v|webm|mov|mkv)$/i.test(String(name));
+}
+
+function applyStageMode() {
+  const on = !!state.videoMode;
+  if (dom.stageVisual) dom.stageVisual.classList.toggle('mode-video', on);
+  if (on && video) {
+    video.classList.add('is-active');
+  } else if (video) {
+    video.classList.remove('is-active');
+  }
+}
+
 let audioCtx = null;
 let sourceNode = null;
+let videoSourceNode = null;
 let splitter = null;
 let analyserL = null;
 let analyserR = null;
@@ -803,6 +830,13 @@ function ensureAudioGraph() {
   splitter.connect(analyserL, 0);
   splitter.connect(analyserR, 1);
   sourceNode.connect(gainNode);
+  if (video) {
+    try {
+      videoSourceNode = audioCtx.createMediaElementSource(video);
+      videoSourceNode.connect(splitter);
+      videoSourceNode.connect(gainNode);
+    } catch { /* already */ }
+  }
   gainNode.connect(eqPreamp);
   let node = eqPreamp;
   for (const f of eqFilters) {
@@ -818,7 +852,7 @@ function ensureAudioGraph() {
 function applyVolume() {
   const v = state.muted ? 0 : state.volume;
   audio.volume = v;
-  // Web Audio 链路上音量由 audio.volume 控制；gain 保持 1，避免与 EQ 叠乘异常
+  if (video) video.volume = v;
   if (gainNode) gainNode.gain.value = 1;
   dom.volVal.textContent = state.muted ? '0' : String(Math.round(state.volume * 100));
   dom.volumeBar.value = String(Math.round((state.muted ? 0 : state.volume) * 100));
@@ -850,16 +884,18 @@ function resumeCtx() {
 }
 
 function isAudioActuallyPlaying() {
-  return !!audio.src && !audio.paused && !audio.ended;
+  const el = media();
+  return !!el.src && !el.paused && !el.ended;
 }
 
 function setEngine(playing) {
   // 有音频源时以 <audio> 实际状态为准，避免自动播放后被错误标成 PAUSED
-  const next = audio.src ? isAudioActuallyPlaying() : !!playing;
+  const mel = media();
+  const next = mel.src ? isAudioActuallyPlaying() : !!playing;
 
   state.playing = next;
   dom.engineLed.classList.toggle('on', next);
-  dom.engineState.textContent = next ? 'PLAYING' : audio.src ? 'PAUSED' : 'STANDBY';
+  dom.engineState.textContent = next ? 'PLAYING' : mel.src ? 'PAUSED' : 'STANDBY';
   if (dom.btnPlay) dom.btnPlay.classList.toggle('is-playing', !!next);
   if (dom.iconPlay) {
     dom.iconPlay.hidden = !!next;
@@ -870,7 +906,9 @@ function setEngine(playing) {
     dom.iconPause.style.display = next ? '' : 'none';
   }
   dom.cdDisc.classList.toggle('spinning', next);
-  dom.stageChip.textContent = next ? 'LASER READING' : audio.src ? 'PAUSE' : 'LASER STANDBY';
+  dom.stageChip.textContent = next
+    ? (state.videoMode ? 'VIDEO READING' : 'LASER READING')
+    : mel.src ? 'PAUSE' : 'LASER STANDBY';
   dom.dspLine.textContent = next
     ? `DSP: 32-BIT FLOAT · ${state.dspPreset || 'FLAT'}${state.eqEnabled ? ' · EQ' : ''} · ACTIVE`
     : `DSP: 32-BIT FLOAT · ${state.dspPreset || 'FLAT'}${state.eqEnabled ? ' · EQ' : ''} · 待机`;
@@ -1473,11 +1511,12 @@ function syncLyrics(time, force = false) {
 }
 
 function refreshPlayTimeDisplay(rawTime) {
-  const t = Number.isFinite(rawTime) ? rawTime : audio.currentTime || 0;
+  const el = media();
+  const t = Number.isFinite(rawTime) ? rawTime : el.currentTime || 0;
   const label = fmtTime(t);
   if (dom.timeCurrent) dom.timeCurrent.textContent = label;
   if (dom.transportTime) dom.transportTime.textContent = label;
-  const d = audio.duration || state.tracks[state.index]?.duration || 0;
+  const d = el.duration || state.tracks[state.index]?.duration || 0;
   if (d) dom.timeTotal.textContent = fmtTime(d);
 }
 
@@ -2090,7 +2129,6 @@ async function loadTrack(i, autoplay = true, options = {}) {
   state.wavePeaks = null;
   state.lastPeaks = null;
   state.lyrics.index = -1;
-  // 切换曲目时清空续播进度与 mp4 回退标记
   track.blobTried = false;
 
   // 进度：优先用调用方指定；否则查本曲已保存进度；手动切歌默认从头
@@ -2112,7 +2150,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
 
   let src = track.url;
   if (!src && track.path && hasDesktop) {
-    const res = await window.jt.readMeta(track.path, { includeCover: true });
+    const res = await window.jt.readMeta(track.path, { includeCover: !isVideoName(track.name) });
     if (res.ok) {
       track.url = res.url;
       track.meta = { ...(track.meta || {}), ...res.data };
@@ -2121,8 +2159,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
       updateNowUI();
       renderPlaylist();
     }
-  } else if (track.path && hasDesktop && track.meta && !track.meta.cover) {
-    // 已有其它元数据时，仅补封面
+  } else if (track.path && hasDesktop && track.meta && !track.meta.cover && !isVideoName(track.name)) {
     try {
       if (window.jt.readCover) {
         const cover = await window.jt.readCover(track.path);
@@ -2131,7 +2168,6 @@ async function loadTrack(i, autoplay = true, options = {}) {
     } catch { /* ignore */ }
   }
 
-  // 切歌后释放其它曲目的封面大图，只保留当前
   for (const t of state.tracks) {
     if (t !== track && t.meta && t.meta.cover) {
       delete t.meta.cover;
@@ -2149,8 +2185,18 @@ async function loadTrack(i, autoplay = true, options = {}) {
     return;
   }
 
-  audio.src = src;
-  audio.load();
+  // 视频：中间区域显示画面；音频：封面+歌词
+  state.videoMode = isVideoName(track.name) || /\.(mp4|m4v|webm|mov)$/i.test(src);
+  applyStageMode();
+
+  const el = media();
+  const other = el === audio ? video : audio;
+  if (other && other.src) {
+    try { other.pause(); } catch { /* ignore */ }
+  }
+  el.src = src;
+  el.load();
+  applyVolume();
   loadTrackLyrics(track);
 
   const trackId = track.id;
@@ -2171,13 +2217,14 @@ async function loadTrack(i, autoplay = true, options = {}) {
     await seekToResumePosition(resumeAt);
   }
 
+  const mel = media();
   if (autoplay) {
     try {
-      if (resumeAt > 0 && Math.abs((audio.currentTime || 0) - Math.min(resumeAt, (audio.duration || resumeAt))) > 1.5) {
+      if (resumeAt > 0 && Math.abs((mel.currentTime || 0) - Math.min(resumeAt, (mel.duration || resumeAt))) > 1.5) {
         await seekToResumePosition(resumeAt);
       }
-      await audio.play();
-      if (resumeAt > 0 && Math.abs((audio.currentTime || 0) - Math.min(resumeAt, (audio.duration || resumeAt))) > 1.5) {
+      await mel.play();
+      if (resumeAt > 0 && Math.abs((mel.currentTime || 0) - Math.min(resumeAt, (mel.duration || resumeAt))) > 1.5) {
         await seekToResumePosition(resumeAt);
       }
       setEngine(true);
@@ -2188,13 +2235,13 @@ async function loadTrack(i, autoplay = true, options = {}) {
     }
   } else {
     syncEngineFromAudio();
-    if (resumeAt > 0) refreshPlayTimeDisplay(audio.currentTime || resumeAt);
+    if (resumeAt > 0) refreshPlayTimeDisplay(mel.currentTime || resumeAt);
   }
 
   // 从头播时歌词区强制回到第一句
-  if (!resumeAt || (audio.currentTime || 0) < 1) {
+  if (!resumeAt || (mel.currentTime || 0) < 1) {
     if (state.lyrics.timed?.length || state.lyrics.plain?.length) {
-      state.lyrics.index = findLyricIndex(state.lyrics.timed || [], audio.currentTime || 0);
+      state.lyrics.index = findLyricIndex(state.lyrics.timed || [], mel.currentTime || 0);
       renderLyricsView(true);
     }
   }
@@ -2235,12 +2282,13 @@ function togglePlay() {
     playIndex(0);
     return;
   }
-  if (!audio.src) return;
+  const mel = media();
+  if (!mel.src) return;
   resumeCtx();
-  if (audio.paused) {
-    audio.play().then(() => setEngine(true)).catch(() => setEngine(false));
+  if (mel.paused) {
+    mel.play().then(() => setEngine(true)).catch(() => setEngine(false));
   } else {
-    audio.pause();
+    mel.pause();
     setEngine(false);
   }
 }
@@ -2782,22 +2830,22 @@ function tick() {
   }
 
   // time + lyrics UI
-  if (!state.seeking && audio.duration) {
-    const t = audio.currentTime;
+  const mel = media();
+  if (!state.seeking && mel.duration) {
+    const t = mel.currentTime;
     refreshPlayTimeDisplay(t);
-    dom.timeTotal.textContent = fmtTime(audio.duration);
-    dom.seekBar.value = String(Math.floor((t / audio.duration) * 1000));
-    syncLyrics(t);
+    dom.timeTotal.textContent = fmtTime(mel.duration);
+    dom.seekBar.value = String(Math.floor((t / mel.duration) * 1000));
+    if (!state.videoMode) syncLyrics(t);
   } else if (!state.seeking) {
-    syncLyrics(audio.currentTime || 0);
+    if (!state.videoMode) syncLyrics(mel.currentTime || 0);
   }
-  // 播放中定期落盘进度
-  if (!state.restoring && state.playing && audio.currentTime > 0.8) {
-    state.resumePosition = audio.currentTime;
+  if (!state.restoring && state.playing && mel.currentTime > 0.8) {
+    state.resumePosition = mel.currentTime;
     const tr = state.index >= 0 ? state.tracks[state.index] : null;
     if (tr?.path) {
       state.trackPositions = state.trackPositions || {};
-      state.trackPositions[pathKeyOf(tr.path)] = audio.currentTime;
+      state.trackPositions[pathKeyOf(tr.path)] = mel.currentTime;
     }
     persistPlaybackProgress(false);
   }
@@ -2861,76 +2909,171 @@ audio.addEventListener('seeked', () => {
   persistPlaybackProgress(true);
 });
 
-audio.addEventListener('play', () => setEngine(true));
-audio.addEventListener('playing', () => setEngine(true));
-
 function mimeForAudioName(name = '') {
   const n = String(name).toLowerCase();
-  if (n.endsWith('.mp4') || n.endsWith('.m4v')) return 'video/mp4';
+  if (n.endsWith('.mp4') || n.endsWith('.m4v') || n.endsWith('.mov')) return 'video/mp4';
   if (n.endsWith('.m4a')) return 'audio/mp4';
   if (n.endsWith('.webm')) return 'video/webm';
+  if (n.endsWith('.mkv')) return 'video/x-matroska';
   if (n.endsWith('.aac')) return 'audio/aac';
   return 'video/mp4';
 }
 
-/** file:// 直接播失败时，改用内存 Blob 回退（部分 MP4 路径有效） */
-async function tryBlobAudioFallback(track) {
-  if (!hasDesktop || !track?.path || !window.jt.readBuffer) return false;
-  try {
-    const buf = await window.jt.readBuffer(track.path);
-    if (!buf || buf.byteLength < 16) return false;
-    // 大视频读入内存会吃内存，限制在 120MB 内做回退
-    if (buf.byteLength > 120 * 1024 * 1024) return false;
-    const blob = new Blob([buf], { type: mimeForAudioName(track.name || track.path) });
-    if (track.blobUrl) {
-      try { URL.revokeObjectURL(track.blobUrl); } catch { /* ignore */ }
-    }
-    track.blobUrl = URL.createObjectURL(blob);
-    audio.src = track.blobUrl;
-    audio.load();
-    const ok = await waitAudioReady(6000);
-    return ok;
-  } catch {
-    return false;
+async function clearMediaAndStop() {
+  try { audio.pause(); } catch { /* ignore */ }
+  if (video) { try { video.pause(); } catch { /* ignore */ } }
+  audio.removeAttribute('src');
+  audio.load();
+  if (video) {
+    video.removeAttribute('src');
+    video.load();
   }
+  state.videoMode = false;
+  applyStageMode();
 }
 
-audio.addEventListener('error', async () => {
+audio.addEventListener('play', () => setEngine(true));
+audio.addEventListener('playing', () => setEngine(true));
+audio.addEventListener('ended', () => {
+  const next = findNextIndex(state.index);
+  if (next === -1) {
+    setEngine(false);
+    return;
+  }
+  loadTrack(next, true);
+});
+audio.addEventListener('loadedmetadata', () => {
+  if (state.index >= 0 && audio.duration) {
+    state.tracks[state.index].duration = audio.duration;
+    dom.timeTotal.textContent = fmtTime(audio.duration);
+    refreshPlayTimeDisplay(audio.currentTime || 0);
+    renderPlaylist();
+  }
+});
+audio.addEventListener('timeupdate', () => {
+  if (state.videoMode) return;
+  if (!audio.src || audio.paused) return;
   if (state.index < 0) return;
+  state.resumePosition = audio.currentTime || 0;
   const track = state.tracks[state.index];
-  if (!track) return;
+  if (track?.path && state.resumePosition > 0.8) {
+    state.trackPositions = state.trackPositions || {};
+    state.trackPositions[pathKeyOf(track.path)] = state.resumePosition;
+  }
+  persistPlaybackProgress(false);
+});
+audio.addEventListener('pause', () => {
+  if (state.videoMode) return;
+  state.resumePosition = audio.currentTime || state.resumePosition || 0;
+  const track = state.index >= 0 ? state.tracks[state.index] : null;
+  if (track?.path && state.resumePosition > 0.8) {
+    state.trackPositions = state.trackPositions || {};
+    state.trackPositions[pathKeyOf(track.path)] = state.resumePosition;
+  }
+  persistAppState(true);
+});
+audio.addEventListener('seeked', () => {
+  if (state.videoMode) return;
+  state.resumePosition = audio.currentTime || 0;
+  if (!state.videoMode) syncLyrics(audio.currentTime || 0, true);
+  persistPlaybackProgress(true);
+});
 
-  // MP4/M4A/WebM：先做 Blob 回退，再判定不支持
-  const needFallback = /\.(mp4|m4v|m4a|webm|aac)$/i.test(track.name || '');
-  if (needFallback && !track.blobTried && track.path && hasDesktop) {
-    track.blobTried = true;
-    dom.statusNowPlaying.textContent = `兼容解码中：${track.name}…`;
-    const ok = await tryBlobAudioFallback(track);
-    if (state.tracks[state.index]?.id !== track.id) return;
-    if (ok) {
-      try {
-        await audio.play();
-        setEngine(true);
-        dom.statusNowPlaying.textContent = `正在播放：${track.meta?.title || track.name}`;
-        return;
-      } catch {
-        /* fall through */
+function onMediaError(el) {
+  return async () => {
+    if (media() !== el) return;
+    if (state.index < 0) return;
+    const track = state.tracks[state.index];
+    if (!track) return;
+
+    const needFallback = /\.(mp4|m4v|m4a|webm|aac)$/i.test(track.name || '');
+    if (needFallback && !track.blobTried && track.path && hasDesktop) {
+      track.blobTried = true;
+      dom.statusNowPlaying.textContent = `兼容解码中：${track.name}…`;
+      const ok = await tryBlobAudioFallback(track);
+      if (ok) {
+        try {
+          await media().play();
+          setEngine(true);
+          return;
+        } catch { /* fall through */ }
       }
     }
-  }
 
-  track.unsupported = true;
-  renderPlaylist();
-  setEngine(false);
-  const errCode = audio.error ? audio.error.code : 0;
-  let hint = '格式或编码不受支持';
-  if (/\.(mp4|m4v)$/i.test(track.name || '')) {
-    hint = 'MP4 若为 HEVC/AC3/DTS 等音轨，内置 Chromium 无法解码';
-  } else if (errCode === 4) {
-    hint = '资源无法解码或路径不可用';
-  }
-  dom.statusNowPlaying.textContent = `无法播放：${track.name}（${hint}）`;
-});
+    track.unsupported = true;
+    renderPlaylist();
+    setEngine(false);
+    let hint = '格式或编码不受支持';
+    if (/\.(mp4|m4v)$/i.test(track.name || '')) {
+      hint = 'MP4 若为 HEVC/AC3/DTS 等音轨，内置 Chromium 无法解码';
+    }
+    dom.statusNowPlaying.textContent = `无法播放：${track.name}（${hint}）`;
+  };
+}
+
+audio.addEventListener('error', onMediaError(audio));
+if (video) {
+  video.addEventListener('play', () => setEngine(true));
+  video.addEventListener('playing', () => setEngine(true));
+  video.addEventListener('pause', () => setEngine(false));
+  video.addEventListener('ended', () => {
+    const next = findNextIndex(state.index);
+    if (next === -1) {
+      setEngine(false);
+      return;
+    }
+    loadTrack(next, true);
+  });
+  video.addEventListener('loadedmetadata', () => {
+    if (state.index >= 0 && video.duration) {
+      state.tracks[state.index].duration = video.duration;
+      dom.timeTotal.textContent = fmtTime(video.duration);
+      refreshPlayTimeDisplay(video.currentTime || 0);
+      renderPlaylist();
+    }
+  });
+  video.addEventListener('timeupdate', () => {
+    if (!state.videoMode) return;
+    if (!video.src || video.paused) return;
+    if (state.index < 0) return;
+    state.resumePosition = video.currentTime || 0;
+    const track = state.tracks[state.index];
+    if (track?.path && state.resumePosition > 0.8) {
+      state.trackPositions = state.trackPositions || {};
+      state.trackPositions[pathKeyOf(track.path)] = state.resumePosition;
+    }
+    persistPlaybackProgress(false);
+  });
+  video.addEventListener('seeked', () => {
+    if (!state.videoMode) return;
+    state.resumePosition = video.currentTime || 0;
+    persistPlaybackProgress(true);
+  });
+  video.addEventListener('error', onMediaError(video));
+}
+
+function tryBlobAudioFallback(track) {
+  return (async () => {
+    if (!hasDesktop || !track?.path || !window.jt.readBuffer) return false;
+    try {
+      const buf = await window.jt.readBuffer(track.path);
+      if (!buf || buf.byteLength < 16) return false;
+      if (buf.byteLength > 120 * 1024 * 1024) return false;
+      const blob = new Blob([buf], { type: mimeForAudioName(track.name || track.path) });
+      if (track.blobUrl) {
+        try { URL.revokeObjectURL(track.blobUrl); } catch { /* ignore */ }
+      }
+      track.blobUrl = URL.createObjectURL(blob);
+      const el = media();
+      el.src = track.blobUrl;
+      el.load();
+      if (state.videoMode) applyStageMode();
+      return await waitAudioReady(6000);
+    } catch {
+      return false;
+    }
+  })();
+}
 
 dom.btnPlay.addEventListener('click', togglePlay);
 dom.btnPrev.addEventListener('click', () => {
@@ -3087,14 +3230,16 @@ dom.btnMute.addEventListener('click', () => {
 dom.seekBar.addEventListener('pointerdown', () => { state.seeking = true; });
 dom.seekBar.addEventListener('pointerup', () => { state.seeking = false; });
 dom.seekBar.addEventListener('change', () => {
-  if (!audio.duration) return;
-  audio.currentTime = (Number(dom.seekBar.value) / 1000) * audio.duration;
+  const smel = media();
+  if (!smel.duration) return;
+  smel.currentTime = (Number(dom.seekBar.value) / 1000) * smel.duration;
   state.seeking = false;
   drawWave();
 });
 dom.seekBar.addEventListener('input', () => {
-  if (!audio.duration) return;
-  const t = (Number(dom.seekBar.value) / 1000) * audio.duration;
+  const smel2 = media();
+  if (!smel2.duration) return;
+  const t = (Number(dom.seekBar.value) / 1000) * smel2.duration;
   refreshPlayTimeDisplay(t);
 });
 
@@ -3106,9 +3251,10 @@ function seekRatioFromClientX(clientX) {
 }
 
 function applySeekRatio(ratio) {
-  if (!audio.duration || !Number.isFinite(audio.duration)) return 0;
-  const t = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
-  audio.currentTime = t;
+  const em = media();
+  if (!em.duration || !Number.isFinite(em.duration)) return 0;
+  const t = Math.min(em.duration, Math.max(0, ratio * em.duration));
+  em.currentTime = t;
   refreshPlayTimeDisplay(t);
   if (dom.seekBar) dom.seekBar.value = String(Math.floor(ratio * 1000));
   drawWave();
@@ -3264,9 +3410,9 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     togglePlay();
   } else if (e.code === 'ArrowRight') {
-    if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+    if (media().duration) media().currentTime = Math.min(media().duration, media().currentTime + 5);
   } else if (e.code === 'ArrowLeft') {
-    if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime - 5);
+    if (media().duration) media().currentTime = Math.max(0, media().currentTime - 5);
   } else if (e.code === 'ArrowUp') {
     e.preventDefault();
     state.volume = Math.min(1, state.volume + state.volumeStep);
