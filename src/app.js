@@ -2640,8 +2640,6 @@ function updateRepeatBtn() {
   }
   state.shuffle = mode === 'shuffle';
 }
-  state.shuffle = mode === 'shuffle';
-}
 
 /* ── Visualization ── */
 
