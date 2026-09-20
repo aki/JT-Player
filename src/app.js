@@ -2631,11 +2631,15 @@ function updateRepeatBtn() {
   const mode = (state.repeat === 'one' || state.repeat === 'shuffle') ? state.repeat : 'all';
   state.repeat = mode;
   if (dom.btnRepeat) {
-    dom.btnRepeat.title = `循环模式：${map[mode]}（点击切换）`;
-    dom.btnRepeat.classList.toggle('active', true);
-    dom.btnRepeat.setAttribute('aria-label', map[mode]);
+    const label = map[mode] || '列表循环';
+    dom.btnRepeat.title = `循环模式：${label}（点击切换）`;
+    dom.btnRepeat.setAttribute('aria-label', label);
     dom.btnRepeat.dataset.mode = mode;
+    // 只切换图标，不改变按钮颜色
+    dom.btnRepeat.classList.remove('active');
   }
+  state.shuffle = mode === 'shuffle';
+}
   state.shuffle = mode === 'shuffle';
 }
 
