@@ -1404,28 +1404,27 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   display: none !important;
 }
 .icon-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(212, 43, 58, 0.12);
+  border-color: var(--line);
+  color: inherit;
+  background: var(--panel-2);
 }
 
-.icon-btn[data-mode="one"].active {
-  border-color: var(--signal);
-  color: var(--signal);
-  background: rgba(61, 219, 217, 0.12);
+/* 循环按钮：只切换图标，不改颜色 */
+#btnRepeat,
+#btnRepeat.active,
+#btnRepeat[data-mode="one"],
+#btnRepeat[data-mode="shuffle"],
+#btnRepeat[data-mode="all"],
+#btnRepeat[data-mode="off"] {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--panel-2);
 }
 
-.icon-btn[data-mode="shuffle"].active {
-  border-color: var(--gold);
-  color: var(--gold);
-  background: rgba(212, 168, 75, 0.12);
-}
-
-.icon-btn[data-mode="all"].active,
-.icon-btn[data-mode="off"].active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(212, 43, 58, 0.12);
+#btnRepeat:hover {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--panel-2);
 }
 
 #btnRepeat .icon-repeat-off,
@@ -1439,9 +1438,6 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
 #btnRepeat[data-mode="one"] .icon-repeat-one,
 #btnRepeat[data-mode="shuffle"] .icon-repeat-shuffle {
   display: block !important;
-}
-#btnRepeat[data-mode="one"] {
-  font-weight: 700;
 }
 
 /* Drop overlay */
