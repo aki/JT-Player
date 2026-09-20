@@ -92,7 +92,7 @@ img { display: block; max-width: 100%; }
   color: #fff;
   outline: none;
 }
-.brand-sub { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 
 /* Settings */
 .settings-overlay {

@@ -154,7 +154,7 @@ const DEFAULT_SETTINGS = {
   autoplayOnLaunch: false,
   lyricSize: 16,
   showDeck: true,
-  subtitle: '静听 · 音乐静听中',
+  subtitle: '静听HIFI音乐，享HIFI人生。',
   onlineLyrics: true,
   lyricsSource: 'auto',
   lyricOffsetMs: 0,
@@ -401,7 +401,16 @@ async function seekToResumePosition(seconds) {
 function loadSettings() {
   const fromDisk = diskState?.settings || {};
   const fromLs = readLocalStorageJson(SETTINGS_KEY) || {};
-  return { ...DEFAULT_SETTINGS, ...fromDisk, ...fromLs };
+  const merged = { ...DEFAULT_SETTINGS, ...fromDisk, ...fromLs };
+  const legacy = new Set([
+    '静听 · 音乐静听中',
+    '静听 · 呈现中',
+    '静听 · 音乐流淌中',
+  ]);
+  if (!merged.subtitle || legacy.has(merged.subtitle)) {
+    merged.subtitle = DEFAULT_SETTINGS.subtitle;
+  }
+  return merged;
 }
 
 function saveSettings(patch) {
