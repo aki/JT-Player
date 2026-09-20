@@ -2681,9 +2681,10 @@ function drawWave() {
   ctx.stroke();
 
   const peaks = state.wavePeaks || syntheticPeaks('idle');
-  const duration = audio.duration || state.tracks[state.index]?.duration || 0;
+  const em = media();
+  const duration = em.duration || state.tracks[state.index]?.duration || 0;
   const progress = duration
-    ? Math.min(1, Math.max(0, (state.seeking ? audio.currentTime : audio.currentTime) / duration))
+    ? Math.min(1, Math.max(0, (em.currentTime || 0) / duration))
     : 0;
   const mid = h / 2;
   const barCount = peaks.length;
@@ -3079,8 +3080,9 @@ function tryBlobAudioFallback(track) {
 
 dom.btnPlay.addEventListener('click', togglePlay);
 dom.btnPrev.addEventListener('click', () => {
-  if (audio.currentTime > 3) {
-    audio.currentTime = 0;
+  const em = media();
+  if (em.currentTime > 3) {
+    em.currentTime = 0;
     return;
   }
   const prev = findPrevIndex(state.index < 0 ? 0 : state.index);
@@ -3257,8 +3259,10 @@ function applySeekRatio(ratio) {
   if (!em.duration || !Number.isFinite(em.duration)) return 0;
   const t = Math.min(em.duration, Math.max(0, ratio * em.duration));
   em.currentTime = t;
+  state.resumePosition = t;
   refreshPlayTimeDisplay(t);
   if (dom.seekBar) dom.seekBar.value = String(Math.floor(ratio * 1000));
+  if (!state.videoMode) syncLyrics(t);
   drawWave();
   return t;
 }
@@ -3280,7 +3284,8 @@ function endWaveScrub() {
 if (dom.waveHit) {
   dom.waveHit.addEventListener('pointerdown', (e) => {
     if (e.button != null && e.button !== 0) return;
-    if (!audio.duration) return;
+    const em = media();
+    if (!em.duration) return;
     e.preventDefault();
     state.seeking = true;
     dom.waveHit.setPointerCapture?.(e.pointerId);
@@ -3300,10 +3305,10 @@ if (dom.waveHit) {
   });
   dom.waveHit.addEventListener('pointercancel', endWaveScrub);
   dom.waveHit.addEventListener('lostpointercapture', endWaveScrub);
-  // click without move still seeks via pointerdown
   dom.waveHit.addEventListener('click', (e) => {
     if (state.seeking) return;
-    if (!audio.duration) return;
+    const em = media();
+    if (!em.duration) return;
     applySeekRatio(seekRatioFromClientX(e.clientX));
   });
 }
