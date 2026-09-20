@@ -2090,6 +2090,8 @@ async function loadTrack(i, autoplay = true, options = {}) {
   state.wavePeaks = null;
   state.lastPeaks = null;
   state.lyrics.index = -1;
+  // 切换曲目时清空续播进度与 mp4 回退标记
+  track.blobTried = false;
 
   // 进度：优先用调用方指定；否则查本曲已保存进度；手动切歌默认从头
   let resumeAt = explicitResume;
@@ -2861,14 +2863,73 @@ audio.addEventListener('seeked', () => {
 
 audio.addEventListener('play', () => setEngine(true));
 audio.addEventListener('playing', () => setEngine(true));
-audio.addEventListener('error', () => {
+
+function mimeForAudioName(name = '') {
+  const n = String(name).toLowerCase();
+  if (n.endsWith('.mp4') || n.endsWith('.m4v')) return 'video/mp4';
+  if (n.endsWith('.m4a')) return 'audio/mp4';
+  if (n.endsWith('.webm')) return 'video/webm';
+  if (n.endsWith('.aac')) return 'audio/aac';
+  return 'video/mp4';
+}
+
+/** file:// 直接播失败时，改用内存 Blob 回退（部分 MP4 路径有效） */
+async function tryBlobAudioFallback(track) {
+  if (!hasDesktop || !track?.path || !window.jt.readBuffer) return false;
+  try {
+    const buf = await window.jt.readBuffer(track.path);
+    if (!buf || buf.byteLength < 16) return false;
+    // 大视频读入内存会吃内存，限制在 120MB 内做回退
+    if (buf.byteLength > 120 * 1024 * 1024) return false;
+    const blob = new Blob([buf], { type: mimeForAudioName(track.name || track.path) });
+    if (track.blobUrl) {
+      try { URL.revokeObjectURL(track.blobUrl); } catch { /* ignore */ }
+    }
+    track.blobUrl = URL.createObjectURL(blob);
+    audio.src = track.blobUrl;
+    audio.load();
+    const ok = await waitAudioReady(6000);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+audio.addEventListener('error', async () => {
   if (state.index < 0) return;
   const track = state.tracks[state.index];
   if (!track) return;
+
+  // MP4/M4A/WebM：先做 Blob 回退，再判定不支持
+  const needFallback = /\.(mp4|m4v|m4a|webm|aac)$/i.test(track.name || '');
+  if (needFallback && !track.blobTried && track.path && hasDesktop) {
+    track.blobTried = true;
+    dom.statusNowPlaying.textContent = `兼容解码中：${track.name}…`;
+    const ok = await tryBlobAudioFallback(track);
+    if (state.tracks[state.index]?.id !== track.id) return;
+    if (ok) {
+      try {
+        await audio.play();
+        setEngine(true);
+        dom.statusNowPlaying.textContent = `正在播放：${track.meta?.title || track.name}`;
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+  }
+
   track.unsupported = true;
   renderPlaylist();
   setEngine(false);
-  dom.statusNowPlaying.textContent = `解码失败：${track.name}`;
+  const errCode = audio.error ? audio.error.code : 0;
+  let hint = '格式或编码不受支持';
+  if (/\.(mp4|m4v)$/i.test(track.name || '')) {
+    hint = 'MP4 若为 HEVC/AC3/DTS 等音轨，内置 Chromium 无法解码';
+  } else if (errCode === 4) {
+    hint = '资源无法解码或路径不可用';
+  }
+  dom.statusNowPlaying.textContent = `无法播放：${track.name}（${hint}）`;
 });
 
 dom.btnPlay.addEventListener('click', togglePlay);
