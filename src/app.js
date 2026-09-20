@@ -1560,6 +1560,16 @@ function selectRange(i) {
   state.selectionAnchor = anchor;
 }
 
+/** Ctrl+A：曲目列表全选 */
+function selectAllTracks() {
+  if (!state.tracks.length) return;
+  state.selectedSet = new Set(state.tracks.map((_, i) => i));
+  if (state.index >= 0) state.selectedIndex = state.index;
+  else state.selectedIndex = 0;
+  state.selectionAnchor = state.selectedIndex;
+  renderPlaylist();
+}
+
 function getSelectedIndices() {
   const set = new Set(state.selectedSet);
   if (state.selectedIndex >= 0) set.add(state.selectedIndex);
@@ -3141,7 +3151,21 @@ dom.btnEq.addEventListener('click', () => {
 
 // Keyboard
 window.addEventListener('keydown', (e) => {
-  const tag = document.activeElement?.tagName;
+  const ae = document.activeElement;
+  const tag = ae?.tagName;
+  const typing = tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    ae?.isContentEditable ||
+    (tag === 'INPUT' && !['range', 'checkbox', 'color', 'button', 'submit'].includes(String(ae.type || 'text')));
+
+  // Ctrl+A：曲目列表全选（输入框内不拦截）
+  if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA' || e.key === 'a' || e.key === 'A')) {
+    if (typing) return;
+    e.preventDefault();
+    selectAllTracks();
+    return;
+  }
+
   if (tag === 'INPUT' && document.activeElement.type !== 'range') return;
   if (e.code === 'Space') {
     e.preventDefault();
