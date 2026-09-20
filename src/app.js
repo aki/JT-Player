@@ -1529,8 +1529,8 @@ function setMeta(track) {
     codec: meta.codec || meta.format || '—',
     sampleRate: meta.sampleRate ? `${meta.sampleRate} Hz` : '—',
     bitrate: [
-      meta.bitsPerSample ? `${meta.bitsPerSample}-bit` : null,
       meta.bitrate ? `${meta.bitrate} kbps` : null,
+      meta.bitsPerSample ? `${meta.bitsPerSample}-bit` : null,
     ].filter(Boolean).join(' · ') || '—',
     quality: meta.lossless ? 'LOSSLESS' : meta.format ? String(meta.format) : '—',
   };
