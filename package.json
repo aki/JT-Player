@@ -45,7 +45,7 @@
       "executableName": "JT Player",
       "signAndEditExecutable": false,
       "sign": null,
-      "publisherName": "JT Player",
+      "signDlls": false,
       "target": [
         {
           "target": "nsis",
