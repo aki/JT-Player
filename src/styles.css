@@ -1278,13 +1278,13 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
 /* 歌词区背景：PC Sound Spectrum */
 .lyric-bg-canvas {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 8%;
-  width: 100%;
-  height: 42%;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6%;
+  width: min(88%, 820px);
+  height: 46%;
   z-index: 1;
-  opacity: 0.35;
+  opacity: 0.42;
   pointer-events: none;
   mix-blend-mode: screen;
 }

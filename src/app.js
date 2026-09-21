@@ -127,6 +127,7 @@ const state = {
   levels: { l: 0, r: 0 },
   smoothLevels: { l: 0, r: 0 },
   rtaBars: new Float32Array(32),
+  lyricBgPeaks: null,
   lastPeaks: null,
   resumePosition: 0,
   resumePath: null,
@@ -2755,7 +2756,7 @@ function drawRta(forceIdle = false) {
   ctx.fillRect(0, baseY, w, 1);
 }
 
-/** 歌词区背景：PC Sound Spectrum（参考视频中段） */
+/** 歌词区背景：PC Sound Spectrum（参考视频中段，LED 向上跳动） */
 const LYRIC_BG_HZ = ['32', '64', '96', '128', '160', '192', '256', '320', '384', '448', '512', '576', '704', '768', '832', '960'];
 
 function drawLyricBgSpectrum(forceIdle = false) {
@@ -2768,42 +2769,63 @@ function drawLyricBgSpectrum(forceIdle = false) {
   const dpr = window.devicePixelRatio || 1;
   const bars = state.rtaBars;
   const n = bars.length;
-  const val = (i) => (forceIdle ? Math.max(0.03, 0.1 * Math.sin(i * 0.5)) : bars[i % n]);
 
-  const labelH = 11 * dpr;
-  const stripH = 20 * dpr;
-  const bandTop = 4 * dpr;
-  const bandH = Math.max(24 * dpr, h - labelH - stripH - bandTop - 6 * dpr);
+  // 峰值电平：快速上跳、缓慢下落
+  if (!state.lyricBgPeaks || state.lyricBgPeaks.length !== n) {
+    state.lyricBgPeaks = new Float32Array(n);
+  }
+  const peaks = state.lyricBgPeaks;
+
+  const labelH = 10 * dpr;
+  const stripH = 16 * dpr;
+  const bandTop = 2 * dpr;
+  const bandH = Math.max(36 * dpr, h - labelH - stripH - bandTop - 4 * dpr);
   const cols = 32;
-  const gap = Math.max(1, 1.2 * dpr);
-  const x0 = 8 * dpr;
-  const colW = (w - 16 * dpr - gap * (cols - 1)) / cols;
+  const gap = Math.max(2 * dpr, 3 * dpr);
+  const x0 = 6 * dpr;
+  const colW = (w - 12 * dpr - gap * (cols - 1)) / cols;
+  const seg = 8;
+  const segH = bandH / seg;
 
   for (let i = 0; i < cols; i++) {
-    const v = val(i);
+    const raw = forceIdle
+      ? Math.max(0.04, 0.22 * Math.abs(Math.sin(performance.now() / 280 + i * 0.55)))
+      : bars[i % n];
+    const v = Math.min(1, raw * 1.4);
+    // 上跳快、回落慢
+    peaks[i % n] = v >= peaks[i % n] ? v : Math.max(v, peaks[i % n] - 0.045);
+
+    const lit = Math.round(v * seg);
+    const peakSeg = Math.round(peaks[i % n] * seg);
     const x = x0 + i * (colW + gap);
-    const seg = 5;
-    const segH = bandH / seg;
-    const lit = Math.round(Math.min(1, v * 1.35) * seg);
+    const colXw = Math.max(3 * dpr, colW);
+
     for (let s = 0; s < seg; s++) {
+      // s=0 底部，向上点亮 —— 竖直向上跳动
       const y = bandTop + (seg - 1 - s) * segH;
       const on = s < lit;
+      const isPeak = peakSeg === s + 1 && peakSeg > lit;
       ctx.fillStyle = on
-        ? s >= 4 ? '#D42B3A' : s >= 3 ? '#D4A84B' : '#F5E56B'
-        : 'rgba(26,29,36,0.35)';
-      ctx.fillRect(x, y + dpr, colW, Math.max(2 * dpr, segH - 2 * dpr));
+        ? s >= 6 ? '#D42B3A' : s >= 4 ? '#D4A84B' : '#F5E56B'
+        : 'rgba(22, 24, 32, 0.25)';
+      ctx.fillRect(x, y + dpr, colXw, Math.max(3 * dpr, segH - 3 * dpr));
+      if (isPeak || (s === peakSeg - 1 && peakSeg > 0 && !on)) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillRect(x, y + dpr, colXw, Math.max(2 * dpr, segH * 0.35));
+      }
     }
   }
 
-  ctx.font = `${Math.max(8, 8 * dpr)}px Consolas, monospace`;
-  ctx.fillStyle = 'rgba(139,144,154,0.75)';
+  ctx.font = `${Math.max(7, 7.5 * dpr)}px Consolas, monospace`;
+  ctx.fillStyle = 'rgba(139,144,154,0.7)';
   ctx.textAlign = 'center';
   for (let i = 0; i < LYRIC_BG_HZ.length; i++) {
-    const x = x0 + ((i + 0.5) * (w - 16 * dpr)) / LYRIC_BG_HZ.length;
-    ctx.fillText(LYRIC_BG_HZ[i], x, bandTop + bandH + labelH - 2 * dpr);
+    const x = x0 + ((i + 0.5) * (w - 12 * dpr)) / LYRIC_BG_HZ.length;
+    ctx.fillText(LYRIC_BG_HZ[i], x, bandTop + bandH + labelH - 1 * dpr);
   }
 
-  const y = h - stripH - 2 * dpr;
+  // 底部 PC Sound Spectrum 功能条：静态，不做左右扫光
+  const y = h - stripH - 1 * dpr;
   const blocks = [
     { t: 'PC Sound Spectrum', c: '#2ec4ff' },
     { t: 'U3.1', c: '#5dffb8' },
@@ -2816,19 +2838,17 @@ function drawLyricBgSpectrum(forceIdle = false) {
   ];
   const widths = [0.34, 0.1, 0.08, 0.08, 0.08, 0.08, 0.12, 0.12];
   let bx = x0;
-  const total = w - 16 * dpr;
+  const total = w - 12 * dpr;
   ctx.textAlign = 'left';
-  ctx.font = `${Math.max(8, 9 * dpr)}px Consolas, monospace`;
-  const now = performance.now() / 180;
+  ctx.font = `${Math.max(7, 8 * dpr)}px Consolas, monospace`;
   for (let i = 0; i < blocks.length; i++) {
     const bw = total * widths[i];
-    const pulse = 0.7 + 0.3 * Math.sin(now + i);
-    ctx.globalAlpha = 0.45 + 0.4 * pulse;
+    ctx.globalAlpha = 0.85;
     ctx.fillStyle = blocks[i].c;
     ctx.fillRect(bx, y, Math.max(2, bw - 2 * dpr), stripH);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(9,10,12,0.85)';
-    ctx.fillText(blocks[i].t, bx + 3 * dpr, y + stripH * 0.65);
+    ctx.fillStyle = 'rgba(9,10,12,0.9)';
+    ctx.fillText(blocks[i].t, bx + 2 * dpr, y + stripH * 0.7);
     bx += bw;
   }
 }
