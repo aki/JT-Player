@@ -47,8 +47,7 @@ const dom = {
   volVal: el('volVal'),
   waveCanvas: el('waveCanvas'),
   rtaCanvas: el('rtaCanvas'),
-  btnRtaStyle: el('btnRtaStyle'),
-  rtaStyleName: el('rtaStyleName'),
+  lyricBgCanvas: el('lyricBgCanvas'),
   cdDisc: el('cdDisc'),
   cdLabel: el('cdLabel'),
   cdCover: el('cdCover'),
@@ -128,7 +127,6 @@ const state = {
   levels: { l: 0, r: 0 },
   smoothLevels: { l: 0, r: 0 },
   rtaBars: new Float32Array(32),
-  rtaStyle: 'pc',
   lastPeaks: null,
   resumePosition: 0,
   resumePath: null,
@@ -170,20 +168,7 @@ const DEFAULT_SETTINGS = {
   eqPreset: 'FLAT',
   eqGains: [0, 0, 0, 0, 0],
   dspPreset: 'FLAT',
-  rtaStyle: 'pc',
 };
-
-/** 频谱样式：参考视频中段的 PC Sound Spectrum + 常用仪表条 */
-const RTA_STYLES = {
-  pc: 'PC SOUND',
-  led: 'LED BAR',
-  classic: 'CLASSIC',
-  line: 'LINE',
-  mirror: 'MIRROR',
-  dot: 'DOT',
-};
-const RTA_STYLE_ORDER = ['pc', 'led', 'classic', 'line', 'mirror', 'dot'];
-const RTA_HZ_LABELS = ['32', '64', '96', '128', '160', '192', '256', '320', '384', '448', '512', '576', '704', '768', '832', '960'];
 
 /** 5 段均衡 */
 const EQ_BANDS = [
@@ -475,8 +460,6 @@ function applySettings(s) {
   state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
   state.dspPreset = state.eqPreset;
   state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[state.eqPreset] || [0, 0, 0, 0, 0]);
-  state.rtaStyle = RTA_STYLES[s.rtaStyle] ? s.rtaStyle : 'pc';
-  updateRtaStyleLabel();
   if (dom.btnDsp) {
     dom.btnDsp.textContent = state.dspPreset;
     dom.btnDsp.classList.toggle('active', state.dspPreset !== 'FLAT');
@@ -583,7 +566,6 @@ function readSettingsForm() {
     eqPreset: state.eqPreset || 'FLAT',
     eqGains: normalizeEqGains(state.eqGains),
     dspPreset: state.dspPreset || state.eqPreset || 'FLAT',
-  rtaStyle: state.rtaStyle || 'pc',
   };
 }
 
@@ -2740,21 +2722,6 @@ function drawWave() {
   }
 }
 
-function updateRtaStyleLabel() {
-  const key = RTA_STYLES[state.rtaStyle] ? state.rtaStyle : 'pc';
-  state.rtaStyle = key;
-  if (dom.rtaStyleName) dom.rtaStyleName.textContent = RTA_STYLES[key] || 'PC SOUND';
-}
-
-function cycleRtaStyle() {
-  const i = RTA_STYLE_ORDER.indexOf(state.rtaStyle);
-  const next = RTA_STYLE_ORDER[(i + 1) % RTA_STYLE_ORDER.length];
-  state.rtaStyle = next;
-  updateRtaStyleLabel();
-  persistSettingsFromForm();
-  drawRta(!state.playing);
-}
-
 function drawRta(forceIdle = false) {
   const canvas = dom.rtaCanvas;
   if (!canvas) return;
@@ -2764,185 +2731,15 @@ function drawRta(forceIdle = false) {
   ctx.fillStyle = '#1A1D24';
   ctx.fillRect(0, 0, w, h);
 
-  const dpr = window.devicePixelRatio || 1;
-  const style = state.rtaStyle || 'pc';
   const bars = state.rtaBars;
   const n = bars.length;
-
-  const val = (i) => (forceIdle ? Math.max(0.04, 0.12 * Math.sin(i * 0.7 + 0.4)) : bars[i]);
-
-  if (style === 'pc') {
-    // 参考视频：PC Sound Spectrum — LED 分段 + 频率刻度 + 彩色功能条
-    const labelH = 12 * dpr;
-    const stripH = 22 * dpr;
-    const bandTop = 6 * dpr;
-    const bandH = h - labelH - stripH - bandTop - 8 * dpr;
-    const cols = 32;
-    const gap = Math.max(1, 1.5 * dpr);
-    const colW = (w - 16 * dpr - gap * (cols - 1)) / cols;
-    const x0 = 8 * dpr;
-
-    // LED 上方柱：按高度拆 1–5 段
-    for (let i = 0; i < cols; i++) {
-      const v = val(i % n);
-      const x = x0 + i * (colW + gap);
-      const seg = 5;
-      const segH = bandH / seg;
-      const lit = Math.round(v * seg);
-      for (let s = 0; s < seg; s++) {
-        const y = bandTop + (seg - 1 - s) * segH;
-        const on = s < lit;
-        ctx.fillStyle = on
-          ? s >= 4 ? '#D42B3A' : s >= 3 ? '#D4A84B' : '#F5E56B'
-          : 'rgba(42,46,56,0.9)';
-        ctx.fillRect(x, y + dpr, colW, Math.max(2 * dpr, segH - 2 * dpr));
-      }
-    }
-
-    // 频率刻度
-    ctx.font = `${Math.max(8, 8 * dpr)}px Consolas, monospace`;
-    ctx.fillStyle = 'rgba(139,144,154,0.95)';
-    ctx.textAlign = 'center';
-    for (let i = 0; i < RTA_HZ_LABELS.length; i++) {
-      const x = x0 + (i + 0.5) * (w - 16 * dpr) / RTA_HZ_LABELS.length;
-      ctx.fillText(RTA_HZ_LABELS[i], x, bandTop + bandH + labelH - 2 * dpr);
-    }
-
-    // PC Sound Spectrum 彩色条（仿视频中部）
-    const y = h - stripH - 4 * dpr;
-    const blocks = [
-      { t: 'PC Sound Spectrum', c: '#2ec4ff' },
-      { t: 'U3.1', c: '#5dffb8' },
-      { t: '♪', c: '#ff6b2c' },
-      { t: '♪', c: '#2f6bff' },
-      { t: 'EQ', c: '#7aa2ff' },
-      { t: 'EQ', c: '#c44bff' },
-      { t: '3D', c: '#ff3d8a' },
-      { t: 'LED', c: '#ff9f1c' },
-    ];
-    let bx = x0;
-    const total = w - 16 * dpr;
-    const widths = [0.34, 0.1, 0.08, 0.08, 0.08, 0.08, 0.12, 0.12];
-    ctx.textAlign = 'left';
-    ctx.font = `${Math.max(8, 9 * dpr)}px Consolas, monospace`;
-    for (let i = 0; i < blocks.length; i++) {
-      const bw = total * widths[i];
-      const pulse = 0.75 + 0.25 * Math.sin(performance.now() / 180 + i);
-      ctx.globalAlpha = 0.55 + 0.45 * pulse;
-      ctx.fillStyle = blocks[i].c;
-      ctx.fillRect(bx, y, bw - 2 * dpr, stripH);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#0b0c10';
-      ctx.fillText(blocks[i].t, bx + 4 * dpr, y + stripH * 0.62);
-      bx += bw;
-    }
-    return;
-  }
-
-  if (style === 'led') {
-    // 横向 LED 点阵条
-    const rows = 8;
-    const cols = 36;
-    const gap = 2 * dpr;
-    const cw = (w - 20 * dpr - gap * (cols - 1)) / cols;
-    const ch = (h - 24 * dpr - gap * (rows - 1)) / rows;
-    const x0 = 10 * dpr;
-    const y0 = 8 * dpr;
-    for (let c = 0; c < cols; c++) {
-      const v = val(c % n);
-      const lit = Math.round(v * rows);
-      for (let r = 0; r < rows; r++) {
-        const on = r < lit;
-        const yy = y0 + (rows - 1 - r) * (ch + gap);
-        ctx.fillStyle = on
-          ? r >= rows - 2 ? '#D42B3A' : r >= rows - 4 ? '#D4A84B' : '#3DDBD9'
-          : 'rgba(42,46,56,0.75)';
-        ctx.beginPath();
-        ctx.arc(x0 + c * (cw + gap) + cw / 2, yy + ch / 2, Math.min(cw, ch) * 0.42, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.font = `${Math.max(8, 9 * dpr)}px Consolas, monospace`;
-    ctx.fillStyle = 'rgba(139,144,154,0.8)';
-    ctx.fillText('LED MATRIX', 10 * dpr, h - 6 * dpr);
-    return;
-  }
-
-  if (style === 'line') {
-    // 曲线频谱
-    const pad = 10 * dpr;
-    const mid = h - pad;
-    ctx.strokeStyle = 'rgba(61,219,217,0.95)';
-    ctx.lineWidth = 2 * dpr;
-    ctx.beginPath();
-    for (let i = 0; i < n; i++) {
-      const x = pad + (i / (n - 1)) * (w - pad * 2);
-      const y = mid - val(i) * (h - pad * 2.2);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(212,168,75,0.55)';
-    ctx.lineWidth = 1 * dpr;
-    ctx.beginPath();
-    for (let i = 0; i < n; i++) {
-      const x = pad + (i / (n - 1)) * (w - pad * 2);
-      const y = mid - Math.max(0, val(i) - 0.08) * (h - pad * 2.2) * 0.75;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(42,46,56,0.8)';
-    ctx.fillRect(0, mid, w, 1 * dpr);
-    return;
-  }
-
-  if (style === 'mirror') {
-    // 中线对称镜像柱
-    const midY = h / 2;
-    const gap = 2 * dpr;
-    const barW = (w - gap * (n + 1)) / n;
-    for (let i = 0; i < n; i++) {
-      const v = val(i);
-      const bh = Math.max(2 * dpr, v * (h * 0.42));
-      const x = gap + i * (barW + gap);
-      const grad = ctx.createLinearGradient(0, midY - bh, 0, midY + bh);
-      grad.addColorStop(0, '#D42B3A');
-      grad.addColorStop(0.5, '#D4A84B');
-      grad.addColorStop(1, '#3DDBD9');
-      ctx.fillStyle = grad;
-      ctx.fillRect(x, midY - bh, barW, bh * 2);
-    }
-    ctx.fillStyle = 'rgba(139,144,154,0.35)';
-    ctx.fillRect(0, midY, w, 1);
-    return;
-  }
-
-  if (style === 'dot') {
-    // 点云频谱
-    const pad = 8 * dpr;
-    for (let i = 0; i < n; i++) {
-      const v = val(i);
-      const x = pad + (i / n) * (w - pad * 2);
-      const dots = 14;
-      const on = Math.round(v * dots);
-      for (let d = 0; d < dots; d++) {
-        const y = h - pad - (d + 0.5) * ((h - pad * 2) / dots);
-        ctx.fillStyle = d < on
-          ? d > dots * 0.75 ? '#D42B3A' : d > dots * 0.5 ? '#D4A84B' : '#3DDBD9'
-          : 'rgba(42,46,56,0.6)';
-        ctx.beginPath();
-        ctx.arc(x, y, 2 * dpr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    return;
-  }
-
-  // classic / default
+  const dpr = window.devicePixelRatio || 1;
   const gap = 2 * dpr;
   const barW = (w - gap * (n + 1)) / n;
   const baseY = h - 4 * dpr;
+
   for (let i = 0; i < n; i++) {
-    const v = val(i);
+    const v = forceIdle ? Math.max(0.04, 0.12 * Math.sin(i * 0.7)) : bars[i];
     const bh = Math.max(2 * dpr, v * (h - 10 * dpr));
     const x = gap + i * (barW + gap);
     const grad = ctx.createLinearGradient(0, baseY, 0, baseY - bh);
@@ -2956,6 +2753,84 @@ function drawRta(forceIdle = false) {
   }
   ctx.fillStyle = 'rgba(139,144,154,0.45)';
   ctx.fillRect(0, baseY, w, 1);
+}
+
+/** 歌词区背景：PC Sound Spectrum（参考视频中段） */
+const LYRIC_BG_HZ = ['32', '64', '96', '128', '160', '192', '256', '320', '384', '448', '512', '576', '704', '768', '832', '960'];
+
+function drawLyricBgSpectrum(forceIdle = false) {
+  const canvas = dom.lyricBgCanvas;
+  if (!canvas || state.videoMode) return;
+  const { w, h } = resizeCanvas(canvas);
+  if (!w || !h) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  const dpr = window.devicePixelRatio || 1;
+  const bars = state.rtaBars;
+  const n = bars.length;
+  const val = (i) => (forceIdle ? Math.max(0.03, 0.1 * Math.sin(i * 0.5)) : bars[i % n]);
+
+  const labelH = 11 * dpr;
+  const stripH = 20 * dpr;
+  const bandTop = 4 * dpr;
+  const bandH = Math.max(24 * dpr, h - labelH - stripH - bandTop - 6 * dpr);
+  const cols = 32;
+  const gap = Math.max(1, 1.2 * dpr);
+  const x0 = 8 * dpr;
+  const colW = (w - 16 * dpr - gap * (cols - 1)) / cols;
+
+  for (let i = 0; i < cols; i++) {
+    const v = val(i);
+    const x = x0 + i * (colW + gap);
+    const seg = 5;
+    const segH = bandH / seg;
+    const lit = Math.round(Math.min(1, v * 1.35) * seg);
+    for (let s = 0; s < seg; s++) {
+      const y = bandTop + (seg - 1 - s) * segH;
+      const on = s < lit;
+      ctx.fillStyle = on
+        ? s >= 4 ? '#D42B3A' : s >= 3 ? '#D4A84B' : '#F5E56B'
+        : 'rgba(26,29,36,0.35)';
+      ctx.fillRect(x, y + dpr, colW, Math.max(2 * dpr, segH - 2 * dpr));
+    }
+  }
+
+  ctx.font = `${Math.max(8, 8 * dpr)}px Consolas, monospace`;
+  ctx.fillStyle = 'rgba(139,144,154,0.75)';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < LYRIC_BG_HZ.length; i++) {
+    const x = x0 + ((i + 0.5) * (w - 16 * dpr)) / LYRIC_BG_HZ.length;
+    ctx.fillText(LYRIC_BG_HZ[i], x, bandTop + bandH + labelH - 2 * dpr);
+  }
+
+  const y = h - stripH - 2 * dpr;
+  const blocks = [
+    { t: 'PC Sound Spectrum', c: '#2ec4ff' },
+    { t: 'U3.1', c: '#5dffb8' },
+    { t: '♪', c: '#ff6b2c' },
+    { t: '♪', c: '#2f6bff' },
+    { t: 'EQ', c: '#7aa2ff' },
+    { t: 'EQ', c: '#c44bff' },
+    { t: '3D', c: '#ff3d8a' },
+    { t: 'LED', c: '#ff9f1c' },
+  ];
+  const widths = [0.34, 0.1, 0.08, 0.08, 0.08, 0.08, 0.12, 0.12];
+  let bx = x0;
+  const total = w - 16 * dpr;
+  ctx.textAlign = 'left';
+  ctx.font = `${Math.max(8, 9 * dpr)}px Consolas, monospace`;
+  const now = performance.now() / 180;
+  for (let i = 0; i < blocks.length; i++) {
+    const bw = total * widths[i];
+    const pulse = 0.7 + 0.3 * Math.sin(now + i);
+    ctx.globalAlpha = 0.45 + 0.4 * pulse;
+    ctx.fillStyle = blocks[i].c;
+    ctx.fillRect(bx, y, Math.max(2, bw - 2 * dpr), stripH);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(9,10,12,0.85)';
+    ctx.fillText(blocks[i].t, bx + 3 * dpr, y + stripH * 0.65);
+    bx += bw;
+  }
 }
 
 function levelsFromAnalyser(analyser, data) {
@@ -3017,6 +2892,7 @@ function tick() {
       state.rtaBars[i] = state.rtaBars[i] * 0.72 + avg * 0.28;
     }
     drawRta();
+    drawLyricBgSpectrum(false);
 
     if (!tdL) {
       tdL = new Uint8Array(analyserL.fftSize);
@@ -3032,6 +2908,7 @@ function tick() {
     } else {
       updateViz(0, 0);
       drawRta(true);
+      drawLyricBgSpectrum(true);
     }
   }
 
@@ -3691,6 +3568,7 @@ window.addEventListener('drop', async (e) => {
 window.addEventListener('resize', () => {
   drawWave();
   drawRta(!state.playing);
+  drawLyricBgSpectrum(!state.playing);
 });
 
 // Settings UI
@@ -3745,12 +3623,8 @@ if (dom.settingsOverlay) {
   });
 });
 
-if (dom.btnRtaStyle) {
-  dom.btnRtaStyle.addEventListener('click', cycleRtaStyle);
-}
 if (dom.rtaCanvas) {
-  dom.rtaCanvas.style.cursor = 'pointer';
-  dom.rtaCanvas.addEventListener('click', cycleRtaStyle);
+  // 右下角频谱仅经典样式，无需切换
 }
 
 // Init
@@ -3769,6 +3643,7 @@ if (dom.rtaCanvas) {
   syncEngineFromAudio();
   drawWave();
   drawRta(!isAudioActuallyPlaying());
+  drawLyricBgSpectrum(!isAudioActuallyPlaying());
   requestAnimationFrame(tick);
   persistAppState(true);
   // play() 在异步恢复里可能稍晚完成，再对齐一次

@@ -232,6 +232,7 @@
         <div class="stage-visual" id="stageVisual">
           <video id="stageVideo" class="stage-video" playsinline preload="metadata" tabindex="-1"></video>
           <img id="stageCover" alt="" />
+          <canvas id="lyricBgCanvas" class="lyric-bg-canvas" aria-hidden="true"></canvas>
           <div class="stage-scrim" id="stageScrim"></div>
           <div class="lyrics" id="lyrics">
             <div class="lyric-scroll" id="lyricScroll">
@@ -403,12 +404,9 @@
         <div class="deck-section grow">
           <div class="deck-head">
             <span class="label-signal"><span class="dot"></span> RTA-3100 / FFT SPECTRUM</span>
-            <button type="button" class="btn small" id="btnRtaStyle" title="切换频谱样式">STYLE</button>
+            <span class="mono dim">32-BAND · 20HZ–20KHZ</span>
           </div>
-          <div class="rta-wrap">
-            <canvas id="rtaCanvas" class="rta-canvas" title="点击切换频谱样式"></canvas>
-            <div class="rta-style-name mono" id="rtaStyleName">PC SOUND</div>
-          </div>
+          <canvas id="rtaCanvas" class="rta-canvas"></canvas>
         </div>
       </aside>
     </main>
