@@ -2779,12 +2779,11 @@ function drawLyricBgSpectrum(forceIdle = false) {
   const labelH = 8 * dpr;
   const bandTop = 2 * dpr;
   const bandH = Math.max(28 * dpr, h - labelH - bandTop - 6 * dpr);
-  // 格子更宽：更少频段、更大列宽
+  // 列距很小，列与列之间也贴近
   const cols = 16;
-  const gap = 3 * dpr;
+  const gap = Math.max(1 * dpr, 2 * dpr);
   const x0 = 6 * dpr;
   const colW = (w - 12 * dpr - gap * (cols - 1)) / cols;
-  // 格子更矮：更多横条、每段更扁
   const seg = 10;
   const segH = bandH / seg;
 
@@ -2799,21 +2798,25 @@ function drawLyricBgSpectrum(forceIdle = false) {
     const lit = Math.round(v * seg);
     const peakSeg = Math.round(peaks[i % n] * seg);
     const x = x0 + i * (colW + gap);
-    // 单格：明显更宽、更矮
-    const cellW = Math.max(8 * dpr, colW * 0.92);
-    const cellH = Math.max(2.5 * dpr, segH * 0.42);
+    // 单格铺满列宽、纵向紧挨堆叠（中间不留空）
+    const cellW = colW;
+    const cellH = segH;
 
     for (let s = 0; s < seg; s++) {
-      const y = bandTop + (seg - 1 - s) * segH + (segH - cellH) / 2;
+      // 自底向上逐格点亮，格与格上下贴齐
+      const y = bandTop + (seg - 1 - s) * segH;
       const on = s < lit;
       const isPeak = peakSeg === s + 1 && peakSeg > lit;
-      ctx.fillStyle = on
-        ? s >= 7 ? '#D42B3A' : s >= 4 ? '#D4A84B' : '#F5E56B'
-        : 'rgba(22, 24, 32, 0.22)';
-      ctx.fillRect(x, y, cellW, cellH);
+      if (on) {
+        ctx.fillStyle = s >= 7 ? '#D42B3A' : s >= 4 ? '#D4A84B' : '#F5E56B';
+        ctx.fillRect(x, y, cellW, cellH);
+      } else {
+        ctx.fillStyle = 'rgba(22, 24, 32, 0.2)';
+        ctx.fillRect(x, y, cellW, cellH);
+      }
       if (isPeak || (s === peakSeg - 1 && peakSeg > 0 && !on)) {
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.fillRect(x, y, cellW, Math.max(2 * dpr, cellH * 0.7));
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fillRect(x, y, cellW, cellH);
       }
     }
   }
