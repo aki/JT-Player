@@ -2822,11 +2822,10 @@ function drawLyricBgSpectrum(forceIdle = false) {
     }
   }
 
-  // 频率刻度：紧贴条带下方（与视频一致）
+  // 频率刻度：与 JT Player 品牌色一致 #3DDBD9
   ctx.font = `${Math.max(7, 7 * dpr)}px Consolas, monospace`;
-  ctx.fillStyle = 'rgba(200,205,210,0.85)';
+  ctx.fillStyle = '#3DDBD9';
   ctx.textAlign = 'center';
-  const labelStep = Math.max(1, Math.floor(cols / LYRIC_BG_HZ.length) || 1);
   for (let i = 0; i < cols; i++) {
     const t = LYRIC_BG_HZ[i % LYRIC_BG_HZ.length];
     const x = 2 * dpr + i * (cellW + gapX) + cellW / 2;
