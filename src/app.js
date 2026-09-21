@@ -2776,10 +2776,9 @@ function drawLyricBgSpectrum(forceIdle = false) {
   }
   const peaks = state.lyricBgPeaks;
 
-  const labelH = 10 * dpr;
-  const stripH = 16 * dpr;
+  const labelH = 8 * dpr;
   const bandTop = 2 * dpr;
-  const bandH = Math.max(28 * dpr, h - labelH - stripH - bandTop - 4 * dpr);
+  const bandH = Math.max(28 * dpr, h - labelH - bandTop - 6 * dpr);
   // 格子更宽：更少频段、更大列宽
   const cols = 16;
   const gap = 3 * dpr;
@@ -2824,35 +2823,7 @@ function drawLyricBgSpectrum(forceIdle = false) {
   ctx.textAlign = 'center';
   for (let i = 0; i < LYRIC_BG_HZ.length; i++) {
     const x = x0 + ((i + 0.5) * (w - 12 * dpr)) / LYRIC_BG_HZ.length;
-    ctx.fillText(LYRIC_BG_HZ[i], x, bandTop + bandH + labelH - 1 * dpr);
-  }
-
-  // 底部 PC Sound Spectrum 功能条：静态，不做左右扫光
-  const y = h - stripH - 1 * dpr;
-  const blocks = [
-    { t: 'PC Sound Spectrum', c: '#2ec4ff' },
-    { t: 'U3.1', c: '#5dffb8' },
-    { t: '♪', c: '#ff6b2c' },
-    { t: '♪', c: '#2f6bff' },
-    { t: 'EQ', c: '#7aa2ff' },
-    { t: 'EQ', c: '#c44bff' },
-    { t: '3D', c: '#ff3d8a' },
-    { t: 'LED', c: '#ff9f1c' },
-  ];
-  const widths = [0.34, 0.1, 0.08, 0.08, 0.08, 0.08, 0.12, 0.12];
-  let bx = x0;
-  const total = w - 12 * dpr;
-  ctx.textAlign = 'left';
-  ctx.font = `${Math.max(7, 8 * dpr)}px Consolas, monospace`;
-  for (let i = 0; i < blocks.length; i++) {
-    const bw = total * widths[i];
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = blocks[i].c;
-    ctx.fillRect(bx, y, Math.max(2, bw - 2 * dpr), stripH);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(9,10,12,0.9)';
-    ctx.fillText(blocks[i].t, bx + 2 * dpr, y + stripH * 0.7);
-    bx += bw;
+    ctx.fillText(LYRIC_BG_HZ[i], x, h - 2 * dpr);
   }
 }
 
