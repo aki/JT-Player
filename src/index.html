@@ -403,9 +403,12 @@
         <div class="deck-section grow">
           <div class="deck-head">
             <span class="label-signal"><span class="dot"></span> RTA-3100 / FFT SPECTRUM</span>
-            <span class="mono dim">32-BAND · 20HZ–20KHZ</span>
+            <button type="button" class="btn small" id="btnRtaStyle" title="切换频谱样式">STYLE</button>
           </div>
-          <canvas id="rtaCanvas" class="rta-canvas"></canvas>
+          <div class="rta-wrap">
+            <canvas id="rtaCanvas" class="rta-canvas" title="点击切换频谱样式"></canvas>
+            <div class="rta-style-name mono" id="rtaStyleName">PC SOUND</div>
+          </div>
         </div>
       </aside>
     </main>
