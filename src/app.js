@@ -2756,8 +2756,13 @@ function drawRta(forceIdle = false) {
   ctx.fillRect(0, baseY, w, 1);
 }
 
-/** 歌词区背景：PC Sound Spectrum（参考视频中段，LED 向上跳动） */
-const LYRIC_BG_HZ = ['32', '64', '96', '128', '160', '192', '256', '320', '384', '448', '512', '576', '704', '768', '832', '960'];
+/** 歌词区背景：PC Sound Spectrum —— 对齐参考视频「中部矮条 + 小黄格」 */
+const LYRIC_BG_HZ = [
+  '32', '64', '96', '128', '160', '192', '256', '320',
+  '384', '448', '512', '576', '704', '768', '832', '960',
+  '1k', '1.2k', '1.6k', '2k', '2.5k', '3k', '4k', '5k',
+  '6k', '8k', '10k', '12k', '16k', '18k', '20k', '—',
+];
 
 function drawLyricBgSpectrum(forceIdle = false) {
   const canvas = dom.lyricBgCanvas;
@@ -2767,66 +2772,65 @@ function drawLyricBgSpectrum(forceIdle = false) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
   const dpr = window.devicePixelRatio || 1;
+
+  // 视频里每格约 18×6~8px，列间很窄
+  const cellW = 16 * dpr;
+  const cellH = 6 * dpr;
+  const gapX = 2 * dpr;
+  const gapY = 1 * dpr; // 紧挨，仅留发丝缝便于看见分层
+  const maxStack = 6;
+  const cols = Math.max(8, Math.floor((w - 4 * dpr) / (cellW + gapX)));
+  const labelH = 10 * dpr;
+  const stripTop = 4 * dpr;
+  const stackH = maxStack * cellH + (maxStack - 1) * gapY;
+  const labelY = stripTop + stackH + labelH;
+
   const bars = state.rtaBars;
   const n = bars.length;
-
-  // 峰值电平：快速上跳、缓慢下落
-  if (!state.lyricBgPeaks || state.lyricBgPeaks.length !== n) {
-    state.lyricBgPeaks = new Float32Array(n);
+  if (!state.lyricBgPeaks || state.lyricBgPeaks.length < cols) {
+    state.lyricBgPeaks = new Float32Array(Math.max(cols, n));
   }
   const peaks = state.lyricBgPeaks;
 
-  const labelH = 8 * dpr;
-  const bandTop = 2 * dpr;
-  const bandH = Math.max(36 * dpr, h - labelH - bandTop - 6 * dpr);
-  // 宽扁：更少列 → 每格更宽；更多层 → 每格更扁
-  const cols = 10;
-  const gap = Math.max(1 * dpr, 2 * dpr);
-  const x0 = 6 * dpr;
-  const colW = (w - 12 * dpr - gap * (cols - 1)) / cols;
-  const seg = 14;
-  const segH = bandH / seg;
-
   for (let i = 0; i < cols; i++) {
+    const src = bars[i % n] || 0;
     const raw = forceIdle
-      ? Math.max(0.04, 0.22 * Math.abs(Math.sin(performance.now() / 280 + i * 0.55)))
-      : bars[i % n];
-    const v = Math.min(1, raw * 1.4);
-    // 上跳快、回落慢
-    peaks[i % n] = v >= peaks[i % n] ? v : Math.max(v, peaks[i % n] - 0.045);
+      ? Math.max(0.05, 0.35 * Math.abs(Math.sin(performance.now() / 220 + i * 0.4)))
+      : src;
+    // 视频里亮条不多，电平略抬升更容易看出跳动
+    const v = Math.min(1, raw * 1.6);
+    const lit = Math.round(v * maxStack);
+    peaks[i] = v >= peaks[i] ? v : Math.max(v, peaks[i] - 0.05);
+    const peakLit = Math.round(peaks[i] * maxStack);
 
-    const lit = Math.round(v * seg);
-    const peakSeg = Math.round(peaks[i % n] * seg);
-    const x = x0 + i * (colW + gap);
-    // 宽扁 + 紧挨：宽=整列宽，高=整层高，上下贴齐不留缝
-    const cellW = colW;
-    const cellH = segH;
+    const x = 2 * dpr + i * (cellW + gapX);
 
-    for (let s = 0; s < seg; s++) {
-      const y = bandTop + (seg - 1 - s) * segH;
+    // 自底向上画小黄条，层与层紧挨
+    for (let s = 0; s < maxStack; s++) {
+      const y = stripTop + (maxStack - 1 - s) * (cellH + gapY);
       const on = s < lit;
-      const isPeak = peakSeg === s + 1 && peakSeg > lit;
+      const isPeak = peakLit === s + 1 && peakLit > lit;
       if (on) {
-        ctx.fillStyle = s >= 10 ? '#D42B3A' : s >= 6 ? '#D4A84B' : '#F5E56B';
+        // 参考视频：几乎全是亮黄
+        ctx.fillStyle = '#F2E14C';
         ctx.fillRect(x, y, cellW, cellH);
-      } else {
-        // 未点亮也画扁条底纹，保持格子形态可见
-        ctx.fillStyle = 'rgba(22, 24, 32, 0.28)';
-        ctx.fillRect(x, y + cellH * 0.35, cellW, cellH * 0.62);
       }
-      if (isPeak || (s === peakSeg - 1 && peakSeg > 0 && !on)) {
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.fillRect(x, y, cellW, Math.max(2 * dpr, cellH * 0.55));
+      if (isPeak) {
+        ctx.fillStyle = 'rgba(255,255,230,0.95)';
+        ctx.fillRect(x, y, cellW, cellH);
       }
     }
   }
 
-  ctx.font = `${Math.max(7, 7.5 * dpr)}px Consolas, monospace`;
-  ctx.fillStyle = 'rgba(139,144,154,0.7)';
+  // 频率刻度：紧贴条带下方（与视频一致）
+  ctx.font = `${Math.max(7, 7 * dpr)}px Consolas, monospace`;
+  ctx.fillStyle = 'rgba(200,205,210,0.85)';
   ctx.textAlign = 'center';
-  for (let i = 0; i < LYRIC_BG_HZ.length; i++) {
-    const x = x0 + ((i + 0.5) * (w - 12 * dpr)) / LYRIC_BG_HZ.length;
-    ctx.fillText(LYRIC_BG_HZ[i], x, h - 2 * dpr);
+  const labelStep = Math.max(1, Math.floor(cols / LYRIC_BG_HZ.length) || 1);
+  for (let i = 0; i < cols; i++) {
+    const t = LYRIC_BG_HZ[i % LYRIC_BG_HZ.length];
+    const x = 2 * dpr + i * (cellW + gapX) + cellW / 2;
+    ctx.fillText(t, x, labelY);
   }
 }
 
