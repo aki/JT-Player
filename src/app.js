@@ -2773,15 +2773,17 @@ function drawLyricBgSpectrum(forceIdle = false) {
   ctx.clearRect(0, 0, w, h);
   const dpr = window.devicePixelRatio || 1;
 
-  // 视频里每格约 18×6~8px，列间很窄
-  const cellW = 16 * dpr;
-  const cellH = 6 * dpr;
-  const gapX = 2 * dpr;
-  const gapY = 1 * dpr; // 紧挨，仅留发丝缝便于看见分层
+  // 按画布宽度相对 720px 设计稿等比放大
+  const designW = 720;
+  const scale = Math.max(1, (w / dpr) / designW);
+  const cellW = Math.round(16 * dpr * scale);
+  const cellH = Math.round(6 * dpr * scale);
+  const gapX = Math.max(1, Math.round(2 * dpr * scale));
+  const gapY = Math.max(1, Math.round(1 * dpr * scale));
   const maxStack = 6;
   const cols = Math.max(8, Math.floor((w - 4 * dpr) / (cellW + gapX)));
-  const labelH = 10 * dpr;
-  const stripTop = 4 * dpr;
+  const labelH = Math.max(10, Math.round(10 * dpr * scale));
+  const stripTop = Math.max(2, Math.round(4 * dpr * scale));
   const stackH = maxStack * cellH + (maxStack - 1) * gapY;
   const labelY = stripTop + stackH + labelH;
 
@@ -2823,7 +2825,7 @@ function drawLyricBgSpectrum(forceIdle = false) {
   }
 
   // 频率刻度：与 JT Player 品牌色一致 #3DDBD9
-  ctx.font = `${Math.max(7, 7 * dpr)}px Consolas, monospace`;
+  ctx.font = `${Math.max(7, Math.round(7 * dpr * scale))}px Consolas, monospace`;
   ctx.fillStyle = '#3DDBD9';
   ctx.textAlign = 'center';
   for (let i = 0; i < cols; i++) {
