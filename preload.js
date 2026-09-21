@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('jt', {
   lyricsCachePath: () => ipcRenderer.invoke('lyrics:cachePath'),
   openLyricsCacheDir: () => ipcRenderer.invoke('lyrics:openCacheDir'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
+  openBgImages: () => ipcRenderer.invoke('dialog:openBgImages'),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);

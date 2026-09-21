@@ -1293,6 +1293,45 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   pointer-events: none;
 }
 
+.stage-bg-custom {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.55) saturate(0.95);
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.stage-visual.bg-custom .stage-bg-custom {
+  opacity: 1;
+  z-index: 0;
+}
+
+.stage-visual.bg-custom #stageCover {
+  opacity: 0 !important;
+}
+
+.stage-visual.bg-cover #stageCover {
+  opacity: 1;
+}
+
+.stage-visual.bg-none #stageCover {
+  opacity: 0 !important;
+}
+
+.stage-visual.bg-none .stage-bg-custom {
+  opacity: 0 !important;
+}
+
+.lyric-bg-canvas.hidden {
+  display: none !important;
+}
+
+.stage-visual.mode-video .stage-bg-custom,
 .stage-visual.mode-video .lyric-bg-canvas {
   display: none;
 }

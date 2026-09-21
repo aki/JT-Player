@@ -578,6 +578,18 @@ async function readSidecarLrc(filePath) {
   return null;
 }
 
+ipcMain.handle('dialog:openBgImages', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择歌词背景图片（可多选）',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] },
+    ],
+  });
+  if (result.canceled) return [];
+  return result.filePaths;
+});
+
 ipcMain.handle('dialog:openFiles', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '打开音频文件',

@@ -48,6 +48,14 @@ const dom = {
   waveCanvas: el('waveCanvas'),
   rtaCanvas: el('rtaCanvas'),
   lyricBgCanvas: el('lyricBgCanvas'),
+  stageBgCustom: el('stageBgCustom'),
+  setBgSpectrum: el('setBgSpectrum'),
+  setBgMode: el('setBgMode'),
+  setBgInterval: el('setBgInterval'),
+  setBgIntervalVal: el('setBgIntervalVal'),
+  btnPickBgImages: el('btnPickBgImages'),
+  btnClearBgImages: el('btnClearBgImages'),
+  bgImagesHint: el('bgImagesHint'),
   cdDisc: el('cdDisc'),
   cdLabel: el('cdLabel'),
   cdCover: el('cdCover'),
@@ -128,6 +136,12 @@ const state = {
   smoothLevels: { l: 0, r: 0 },
   rtaBars: new Float32Array(32),
   lyricBgPeaks: null,
+  bgSpectrum: true,
+  bgMode: 'cover',
+  bgImages: [],
+  bgIntervalSec: 8,
+  bgImageIdx: 0,
+  bgTimer: null,
   lastPeaks: null,
   resumePosition: 0,
   resumePath: null,
@@ -169,6 +183,10 @@ const DEFAULT_SETTINGS = {
   eqPreset: 'FLAT',
   eqGains: [0, 0, 0, 0, 0],
   dspPreset: 'FLAT',
+  bgSpectrum: true,
+  bgMode: 'cover',
+  bgImages: [],
+  bgIntervalSec: 8,
 };
 
 /** 5 段均衡 */
@@ -443,6 +461,76 @@ function applyLyricSize(value) {
   if (dom.setLyricSizeVal) dom.setLyricSizeVal.textContent = `${px}px`;
 }
 
+function pathToFileUrl(p) {
+  if (!p) return '';
+  const s = String(p).replace(/\\/g, '/');
+  return encodeURI(s.startsWith('/') ? `file://${s}` : `file:///${s}`);
+}
+
+function updateBgImagesHint() {
+  if (!dom.bgImagesHint) return;
+  const n = (state.bgImages || []).length;
+  dom.bgImagesHint.textContent = n
+    ? `已选 ${n} 张${n > 1 ? ` · 每 ${state.bgIntervalSec}s 轮播` : ''}`
+    : '未选择图片';
+  if (dom.setBgIntervalVal) dom.setBgIntervalVal.textContent = `${state.bgIntervalSec}s`;
+}
+
+function stopBgCarousel() {
+  if (state.bgTimer) {
+    clearInterval(state.bgTimer);
+    state.bgTimer = null;
+  }
+}
+
+function applyLyricBackground() {
+  const vis = dom.stageVisual;
+  if (!vis) return;
+  const mode = state.bgMode || 'cover';
+  vis.classList.remove('bg-cover', 'bg-custom', 'bg-none');
+  const imgs = state.bgImages || [];
+  const useCustom = mode === 'custom' || (mode === 'cover+custom' && imgs.length > 0);
+  if (mode === 'none') {
+    vis.classList.add('bg-none');
+  } else if (useCustom && imgs.length) {
+    vis.classList.add('bg-custom');
+  } else if (mode === 'cover+custom' && !imgs.length) {
+    vis.classList.add('bg-cover');
+  } else if (mode === 'custom' && !imgs.length) {
+    vis.classList.add('bg-none');
+  } else {
+    vis.classList.add('bg-cover');
+  }
+
+  // 频谱显隐
+  if (dom.lyricBgCanvas) {
+    const showSpec = state.bgSpectrum !== false && !state.videoMode;
+    dom.lyricBgCanvas.classList.toggle('hidden', !showSpec);
+  }
+
+  // 自定义图 / 轮播
+  stopBgCarousel();
+  if (dom.stageBgCustom) {
+    if (useCustom && imgs.length) {
+      if (state.bgImageIdx >= imgs.length) state.bgImageIdx = 0;
+      dom.stageBgCustom.src = pathToFileUrl(imgs[state.bgImageIdx]);
+      if (imgs.length > 1) {
+        const sec = Math.max(3, Math.min(30, state.bgIntervalSec || 8));
+        state.bgTimer = setInterval(() => {
+          if (state.videoMode) return;
+          state.bgImageIdx = (state.bgImageIdx + 1) % (state.bgImages || []).length;
+          if (dom.stageBgCustom && state.bgImages[state.bgImageIdx]) {
+            dom.stageBgCustom.src = pathToFileUrl(state.bgImages[state.bgImageIdx]);
+          }
+        }, sec * 1000);
+      }
+    } else {
+      dom.stageBgCustom.removeAttribute('src');
+    }
+  }
+  updateBgImagesHint();
+}
+
 function applySettings(s) {
   const r = s.repeat;
   if (r === 'one' || r === 'shuffle' || r === 'all') state.repeat = r;
@@ -461,6 +549,14 @@ function applySettings(s) {
   state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
   state.dspPreset = state.eqPreset;
   state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[state.eqPreset] || [0, 0, 0, 0, 0]);
+  state.bgSpectrum = s.bgSpectrum !== false;
+  state.bgMode = ['cover', 'custom', 'cover+custom', 'none'].includes(s.bgMode) ? s.bgMode : 'cover';
+  state.bgImages = Array.isArray(s.bgImages) ? s.bgImages.filter(Boolean) : [];
+  state.bgIntervalSec = Math.min(30, Math.max(3, Number(s.bgIntervalSec) || 8));
+  if (dom.setBgSpectrum) dom.setBgSpectrum.checked = state.bgSpectrum;
+  if (dom.setBgMode) dom.setBgMode.value = state.bgMode;
+  if (dom.setBgInterval) dom.setBgInterval.value = String(state.bgIntervalSec);
+  applyLyricBackground();
   if (dom.btnDsp) {
     dom.btnDsp.textContent = state.dspPreset;
     dom.btnDsp.classList.toggle('active', state.dspPreset !== 'FLAT');
@@ -567,6 +663,10 @@ function readSettingsForm() {
     eqPreset: state.eqPreset || 'FLAT',
     eqGains: normalizeEqGains(state.eqGains),
     dspPreset: state.dspPreset || state.eqPreset || 'FLAT',
+  bgSpectrum: state.bgSpectrum !== false,
+  bgMode: state.bgMode || 'cover',
+  bgImages: Array.isArray(state.bgImages) ? state.bgImages : [],
+  bgIntervalSec: state.bgIntervalSec || 8,
   };
 }
 
@@ -574,6 +674,55 @@ function persistSettingsFromForm() {
   const patch = readSettingsForm();
   const s = saveSettings(patch);
   applySettings(s);
+}
+
+if (dom.setOnlineLyrics) { /* lyrics settings handled below */ }
+
+// 歌词背景设置
+if (dom.setBgSpectrum) {
+  dom.setBgSpectrum.addEventListener('change', () => {
+    state.bgSpectrum = !!dom.setBgSpectrum.checked;
+    applyLyricBackground();
+    persistSettingsFromForm();
+  });
+}
+if (dom.setBgMode) {
+  dom.setBgMode.addEventListener('change', () => {
+    state.bgMode = dom.setBgMode.value || 'cover';
+    applyLyricBackground();
+    persistSettingsFromForm();
+  });
+}
+if (dom.setBgInterval) {
+  dom.setBgInterval.addEventListener('input', () => {
+    state.bgIntervalSec = Number(dom.setBgInterval.value) || 8;
+    if (dom.setBgIntervalVal) dom.setBgIntervalVal.textContent = `${state.bgIntervalSec}s`;
+    applyLyricBackground();
+  });
+  dom.setBgInterval.addEventListener('change', persistSettingsFromForm);
+}
+if (dom.btnPickBgImages) {
+  dom.btnPickBgImages.addEventListener('click', async () => {
+    if (!hasDesktop || !window.jt.openBgImages) return;
+    const paths = await window.jt.openBgImages();
+    if (!paths || !paths.length) return;
+    state.bgImages = [...new Set([...(state.bgImages || []), ...paths])];
+    state.bgImageIdx = 0;
+    if (state.bgMode === 'cover') {
+      state.bgMode = 'custom';
+      if (dom.setBgMode) dom.setBgMode.value = 'custom';
+    }
+    applyLyricBackground();
+    persistSettingsFromForm();
+  });
+}
+if (dom.btnClearBgImages) {
+  dom.btnClearBgImages.addEventListener('click', () => {
+    state.bgImages = [];
+    state.bgImageIdx = 0;
+    applyLyricBackground();
+    persistSettingsFromForm();
+  });
 }
 
 // 字号滑条：拖动即时预览，松开/变更后写入设置
@@ -783,6 +932,7 @@ function applyStageMode() {
   } else if (video) {
     video.classList.remove('is-active');
   }
+  applyLyricBackground();
 }
 
 let audioCtx = null;
@@ -2190,6 +2340,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
   // 视频：中间区域显示画面；音频：封面+歌词
   state.videoMode = isVideoName(track.name) || /\.(mp4|m4v|webm|mov)$/i.test(src);
   applyStageMode();
+  applyLyricBackground();
 
   const el = media();
   const other = el === audio ? video : audio;
@@ -2767,6 +2918,8 @@ const LYRIC_BG_HZ = [
 function drawLyricBgSpectrum(forceIdle = false) {
   const canvas = dom.lyricBgCanvas;
   if (!canvas || state.videoMode) return;
+  if (state.bgSpectrum === false) return;
+  if (canvas.classList.contains('hidden')) return;
   const { w, h } = resizeCanvas(canvas);
   if (!w || !h) return;
   const ctx = canvas.getContext('2d');

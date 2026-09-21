@@ -99,6 +99,40 @@
           </section>
 
           <section class="settings-group">
+            <h3>歌词背景</h3>
+            <label class="settings-row">
+              <span>频谱图（底边矮条）</span>
+              <input type="checkbox" id="setBgSpectrum" checked />
+            </label>
+            <label class="settings-row">
+              <span>背景图</span>
+              <select id="setBgMode">
+                <option value="cover">专辑封面</option>
+                <option value="custom">自定义图片</option>
+                <option value="cover+custom">封面 + 自定义轮播</option>
+                <option value="none">无背景图</option>
+              </select>
+            </label>
+            <label class="settings-row">
+              <span>自定义背景图</span>
+              <div class="settings-range">
+                <button type="button" class="btn" id="btnPickBgImages">选择图片…</button>
+                <button type="button" class="btn" id="btnClearBgImages">清空</button>
+              </div>
+            </label>
+            <div class="settings-row">
+              <span class="dim" id="bgImagesHint">未选择图片</span>
+            </div>
+            <label class="settings-row">
+              <span>多图轮播间隔</span>
+              <div class="settings-range">
+                <input type="range" id="setBgInterval" min="3" max="30" step="1" />
+                <span class="mono dim" id="setBgIntervalVal">8s</span>
+              </div>
+            </label>
+          </section>
+
+          <section class="settings-group">
             <h3>界面</h3>
             <label class="settings-row">
               <span>显示右侧仪表栏</span>
@@ -231,6 +265,7 @@
       <section class="stage">
         <div class="stage-visual" id="stageVisual">
           <video id="stageVideo" class="stage-video" playsinline preload="metadata" tabindex="-1"></video>
+          <img id="stageBgCustom" class="stage-bg-custom" alt="" />
           <img id="stageCover" alt="" />
           <canvas id="lyricBgCanvas" class="lyric-bg-canvas" aria-hidden="true"></canvas>
           <div class="stage-scrim" id="stageScrim"></div>
