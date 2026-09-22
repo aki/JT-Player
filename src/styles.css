@@ -287,6 +287,7 @@ img { display: block; max-width: 100%; }
   font-size: inherit;
   line-height: 1.55;
   color: var(--muted);
+  opacity: var(--lyric-opacity, 1);
   text-shadow: 0 2px 12px rgba(0,0,0,0.85);
   max-width: 100%;
   width: 100%;

@@ -115,6 +115,8 @@ const dom = {
   setLyricOffsetVal: el('setLyricOffsetVal'),
   setLyricColor: el('setLyricColor'),
   setLyricColorVal: el('setLyricColorVal'),
+  setLyricOpacity: el('setLyricOpacity'),
+  setLyricOpacityVal: el('setLyricOpacityVal'),
   fileInput: el('fileInput'),
   app: el('app'),
 };
@@ -173,6 +175,8 @@ const DEFAULT_SETTINGS = {
   autoplayAfterAdd: true,
   autoplayOnLaunch: false,
   lyricSize: 16,
+  lyricActiveColor: '#3DDBD9',
+  lyricOpacity: 100,
   showDeck: true,
   subtitle: '静听HIFI音乐，享HIFI人生。',
   onlineLyrics: true,
@@ -545,6 +549,7 @@ function applySettings(s) {
   applyLyricSize(s.lyricSize);
   applyLyricOffset(state.lyricOffsetMs);
   applyLyricColor(s.lyricActiveColor);
+  applyLyricOpacity(s.lyricOpacity);
   state.eqEnabled = !!s.eqEnabled;
   state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
   state.dspPreset = state.eqPreset;
@@ -585,6 +590,7 @@ function fillSettingsForm(s) {
   }
   applyLyricOffset(s.lyricOffsetMs);
   applyLyricColor(s.lyricActiveColor);
+  applyLyricOpacity(s.lyricOpacity);
 }
 
 function applyLyricColor(value) {
@@ -597,6 +603,20 @@ function applyLyricColor(value) {
     ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
     : hex;
   if (dom.setLyricColorVal) dom.setLyricColorVal.textContent = hex.toUpperCase();
+}
+
+function normalizeLyricOpacity(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 100;
+  return Math.min(100, Math.max(30, Math.round(n)));
+}
+
+function applyLyricOpacity(value) {
+  const pct = normalizeLyricOpacity(value);
+  state.lyricOpacity = pct;
+  document.documentElement.style.setProperty('--lyric-opacity', String(pct / 100));
+  if (dom.setLyricOpacity) dom.setLyricOpacity.value = String(pct);
+  if (dom.setLyricOpacityVal) dom.setLyricOpacityVal.textContent = `${pct}%`;
 }
 
 function applyLyricOffset(ms) {
@@ -659,6 +679,7 @@ function readSettingsForm() {
     lyricsSource: dom.setLyricsSource?.value || 'auto',
     lyricOffsetMs: Math.min(2000, Math.max(-2000, Number(dom.setLyricOffset?.value) || 0)),
     lyricActiveColor: dom.setLyricColor?.value || DEFAULT_SETTINGS.lyricActiveColor,
+    lyricOpacity: normalizeLyricOpacity(dom.setLyricOpacity?.value),
     eqEnabled: !!state.eqEnabled,
     eqPreset: state.eqPreset || 'FLAT',
     eqGains: normalizeEqGains(state.eqGains),
@@ -743,6 +764,12 @@ if (dom.setLyricColor) {
     applyLyricColor(dom.setLyricColor.value);
   });
   dom.setLyricColor.addEventListener('change', persistSettingsFromForm);
+}
+if (dom.setLyricOpacity) {
+  dom.setLyricOpacity.addEventListener('input', () => {
+    applyLyricOpacity(dom.setLyricOpacity.value);
+  });
+  dom.setLyricOpacity.addEventListener('change', persistSettingsFromForm);
 }
 
 async function restoreAppState() {
