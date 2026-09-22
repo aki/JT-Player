@@ -94,7 +94,8 @@ function hideToTray() {
   if (!tray) {
     const icon = getTrayIcon();
     tray = new Tray(icon || nativeImage.createEmpty());
-    tray.setToolTip('JT Player 静听');
+    // 不显示托盘悬停提示文字
+    tray.setToolTip('');
     tray.on('mouse-enter', showTrayPopup);
     tray.on('mouse-leave', () => {
       // 短暂延迟，便于移入控制条
