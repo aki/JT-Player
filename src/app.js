@@ -3221,35 +3221,13 @@ let freqData = null;
 let tdL = null;
 let tdR = null;
 
-let tickFrame = 0;
-let lastUiMs = 0;
-
-function pageHidden() {
-  return typeof document !== 'undefined' && document.hidden === true;
-}
-
 function tick() {
-  requestAnimationFrame(tick);
-  // 托盘/最小化/后台：大幅降频，避免 CPU 空转
-  if (pageHidden()) {
-    tickFrame += 1;
-    if (tickFrame % 30 !== 0) return;
-  } else {
-    tickFrame += 1;
-  }
-
-  const playing = isAudioActuallyPlaying();
-  // 播放中约 30fps 更新仪表；暂停时更低频
-  const vizStride = playing ? 2 : 8;
-  const uiStride = playing ? 2 : 4;
-  const doViz = tickFrame % vizStride === 0;
-  const doUi = tickFrame % uiStride === 0;
-
-  if (doViz && masterAnalyser) {
+  if (masterAnalyser) {
     if (!freqData) freqData = new Uint8Array(masterAnalyser.frequencyBinCount);
     masterAnalyser.getByteFrequencyData(freqData);
     const n = 32;
     for (let i = 0; i < n; i++) {
+      // logarithmic-ish mapping
       const start = Math.floor(Math.pow(i / n, 1.5) * (freqData.length - 1));
       const end = Math.max(start + 1, Math.floor(Math.pow((i + 1) / n, 1.5) * (freqData.length - 1)));
       let sum = 0;
@@ -3258,26 +3236,27 @@ function tick() {
       state.rtaBars[i] = state.rtaBars[i] * 0.72 + avg * 0.28;
     }
     drawRta();
-    if (!state.videoMode) drawLyricBgSpectrum(false);
+    drawLyricBgSpectrum(false);
 
     if (!tdL) {
       tdL = new Uint8Array(analyserL.fftSize);
       tdR = new Uint8Array(analyserR.fftSize);
     }
-    updateViz(levelsFromAnalyser(analyserL, tdL), levelsFromAnalyser(analyserR, tdR));
-    if (!state.seeking) drawWave();
-  } else if (doViz && !masterAnalyser) {
-    if (playing) updateViz(0.05 + Math.random() * 0.02, 0.04 + Math.random() * 0.02);
-    else {
+    const l = levelsFromAnalyser(analyserL, tdL);
+    const r = levelsFromAnalyser(analyserR, tdR);
+    updateViz(l, r);
+  } else {
+    if (state.playing) {
+      // soft idle motion when graph not ready
+      updateViz(0.05 + Math.random() * 0.02, 0.04 + Math.random() * 0.02);
+    } else {
       updateViz(0, 0);
       drawRta(true);
-      if (!state.videoMode) drawLyricBgSpectrum(true);
+      drawLyricBgSpectrum(true);
     }
-    if (!state.seeking) drawWave();
   }
 
-  if (!doUi) return;
-
+  // time + lyrics UI
   const mel = media();
   if (!state.seeking && mel.duration) {
     const t = mel.currentTime;
@@ -3288,7 +3267,7 @@ function tick() {
   } else if (!state.seeking) {
     if (!state.videoMode) syncLyrics(mel.currentTime || 0);
   }
-  if (!state.restoring && playing && mel.currentTime > 0.8) {
+  if (!state.restoring && state.playing && mel.currentTime > 0.8) {
     state.resumePosition = mel.currentTime;
     const tr = state.index >= 0 ? state.tracks[state.index] : null;
     if (tr?.path) {
@@ -3297,15 +3276,9 @@ function tick() {
     }
     persistPlaybackProgress(false);
   }
+  drawWave();
+  requestAnimationFrame(tick);
 }
-
-document.addEventListener('visibilitychange', () => {
-  if (!pageHidden()) {
-    drawWave();
-    drawRta(!state.playing);
-    if (!state.videoMode) drawLyricBgSpectrum(!state.playing);
-  }
-});
 
 /* ── Events ── */
 
