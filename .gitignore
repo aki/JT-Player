@@ -3,13 +3,8 @@ release/
 app.asar
 tools/
 *.zip
-electron-err.log
-electron-out.log
 *.log
 .DS_Store
 Thumbs.db
-assets/*.bmp
-assets/ui-orient*.png
-assets/ui-cdp*.png
-assets/ui-cdp*.jpg
-assets/ui-preview*.png
+assets/
+

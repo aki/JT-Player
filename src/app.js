@@ -2,7 +2,6 @@
 
 const AUDIO_EXT = /\.(mp3|wav|flac|ogg|oga|m4a|aac|webm|opus|mp4|aiff|aif)$/i;
 const DECODE_MAX_BYTES = 24 * 1024 * 1024; // 波形解码上限，降低内存
-const COVER_MAX_BYTES_ESTIMATE = 0; // 仅当前曲加载封面
 
 const el = (id) => document.getElementById(id);
 
@@ -3821,10 +3820,6 @@ if (dom.settingsOverlay) {
     }
   });
 });
-
-if (dom.rtaCanvas) {
-  // 右下角频谱仅经典样式，无需切换
-}
 
 // Init
 (async () => {
