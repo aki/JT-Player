@@ -887,7 +887,8 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
 .lyric-badge {
   position: absolute;
   left: 12px;
-  bottom: 12px;
+  top: 12px;
+  bottom: auto;
   z-index: 30;
   padding: 6px 10px;
   border: 1px solid var(--line);
@@ -913,7 +914,8 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
 .lyrics-menu {
   position: absolute;
   left: 12px;
-  bottom: 48px;
+  top: 48px;
+  bottom: auto;
   z-index: 40;
   min-width: 220px;
   padding: 4px;
@@ -1275,21 +1277,20 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   border: 1px solid var(--line);
 }
 
-/* 歌词区背景：PC Sound Spectrum（参考视频：中部一条矮带） */
-/* 歌词区背景：PC Sound Spectrum —— 等比铺满歌词区宽度 */
+/* 歌词区背景：PC Sound Spectrum —— 置底 + 半透明 */
 .lyric-bg-canvas {
   position: absolute;
   left: 8px;
   right: 8px;
   width: auto;
   transform: none;
-  bottom: 20px;
-  /* 按原 720×96 比例，宽度跟歌词区走时高度等比放大 */
+  bottom: 12px;
+  top: auto;
   aspect-ratio: 720 / 96;
   height: auto;
   max-height: 28%;
   z-index: 1;
-  opacity: 0.85;
+  opacity: 0.38;
   pointer-events: none;
 }
 
