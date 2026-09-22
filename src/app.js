@@ -3502,6 +3502,21 @@ dom.volumeBar.addEventListener('input', () => {
   applyVolume();
 });
 
+// 音量区滚轮调音量
+function onVolumeWheel(e) {
+  e.preventDefault();
+  const step = state.volumeStep || 0.05;
+  const delta = e.deltaY < 0 ? step : -step;
+  state.volume = Math.min(1, Math.max(0, state.volume + delta));
+  state.muted = state.volume <= 0;
+  applyVolume();
+}
+if (dom.volumeBar) dom.volumeBar.addEventListener('wheel', onVolumeWheel, { passive: false });
+const volBlock = document.querySelector('.vol-block');
+if (volBlock) volBlock.addEventListener('wheel', onVolumeWheel, { passive: false });
+const volRow = document.querySelector('.vol-row');
+if (volRow) volRow.addEventListener('wheel', onVolumeWheel, { passive: false });
+
 dom.btnMute.addEventListener('click', () => {
   state.muted = !state.muted;
   applyVolume();
