@@ -91,6 +91,11 @@ const dom = {
   eqPresetSelect: el('eqPresetSelect'),
   btnEqReset: el('btnEqReset'),
   eqBands: el('eqBands'),
+  eqPreamp: el('eqPreamp'),
+  eqPreampVal: el('eqPreampVal'),
+  eqHp: el('eqHp'),
+  eqLp: el('eqLp'),
+  eqCurve: el('eqCurve'),
   eqStatus: el('eqStatus'),
   playlistMenu: el('playlistMenu'),
   btnRepeat: el('btnRepeat'),
@@ -154,7 +159,10 @@ const state = {
   searchQuery: '',
   eqEnabled: false,
   eqPreset: 'FLAT',
-  eqGains: [0, 0, 0, 0, 0],
+  eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  eqPreampDb: 0,
+  eqHpHz: 0,
+  eqLpHz: 0,
   dspPreset: 'FLAT',
   lyrics: {
     timed: null,
@@ -186,7 +194,10 @@ const DEFAULT_SETTINGS = {
   lyricActiveColor: '#3DDBD9',
   eqEnabled: false,
   eqPreset: 'FLAT',
-  eqGains: [0, 0, 0, 0, 0],
+  eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  eqPreampDb: 0,
+  eqHpHz: 0,
+  eqLpHz: 0,
   dspPreset: 'FLAT',
   bgSpectrum: true,
   bgMode: 'cover',
@@ -194,24 +205,31 @@ const DEFAULT_SETTINGS = {
   bgIntervalSec: 8,
 };
 
-/** 5 段均衡 */
+/** 10 段图示 EQ（ISO 近似）：低切/前级/高切 + 各频段 */
 const EQ_BANDS = [
-  { freq: 60, label: '60', type: 'lowshelf' },
-  { freq: 230, label: '230', type: 'peaking' },
-  { freq: 910, label: '910', type: 'peaking' },
-  { freq: 4000, label: '4k', type: 'peaking' },
-  { freq: 14000, label: '14k', type: 'highshelf' },
+  { freq: 31, label: '31', type: 'lowshelf', q: 0.7 },
+  { freq: 62, label: '62', type: 'peaking', q: 1.1 },
+  { freq: 125, label: '125', type: 'peaking', q: 1.1 },
+  { freq: 250, label: '250', type: 'peaking', q: 1.1 },
+  { freq: 500, label: '500', type: 'peaking', q: 1.1 },
+  { freq: 1000, label: '1k', type: 'peaking', q: 1.1 },
+  { freq: 2000, label: '2k', type: 'peaking', q: 1.1 },
+  { freq: 4000, label: '4k', type: 'peaking', q: 1.1 },
+  { freq: 8000, label: '8k', type: 'peaking', q: 1.1 },
+  { freq: 16000, label: '16k', type: 'highshelf', q: 0.7 },
 ];
 
-/** DSP / EQ 预设（dB） */
+/** DSP / EQ 预设（dB，对应 10 段） */
 const DSP_PRESETS = {
-  FLAT: [0, 0, 0, 0, 0],
-  VOCAL: [-3, 2, 5, 4, 1],
-  CLASSIC: [-2, 0, 1, 3, 4],
-  JAZZ: [2, 1, 0, 2, 3],
-  ROCK: [4, 3, -1, 2, 4],
-  HEADPHONE: [3, 1, 0, 3, 5],
-  CUSTOM: [0, 0, 0, 0, 0],
+  FLAT:        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  VOCAL:       [-3, -1, 1, 3, 4, 3, 2, 1, 0, -1],
+  CLASSIC:     [-2, -1, 0, 1, 1, 2, 3, 3, 2, 1],
+  JAZZ:        [2, 1, 0, 1, 2, 1, 1, 2, 3, 3],
+  ROCK:        [4, 3, 1, -1, -1, 1, 2, 3, 4, 4],
+  HEADPHONE:   [2, 1, 0, 0, 1, 2, 3, 3, 4, 5],
+  BASS:        [6, 5, 3, 1, 0, 0, 0, 0, 1, 1],
+  TREBLE:      [-1, -1, 0, 0, 0, 1, 2, 4, 5, 6],
+  CUSTOM:      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 // 磁盘状态缓存（Electron userData / localStorage 双写）
@@ -558,7 +576,10 @@ function applySettings(s) {
   state.eqEnabled = !!s.eqEnabled;
   state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
   state.dspPreset = state.eqPreset;
-  state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[state.eqPreset] || [0, 0, 0, 0, 0]);
+  state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[state.eqPreset] || [0,0,0,0,0,0,0,0,0,0]);
+  state.eqPreampDb = Math.min(12, Math.max(-12, Number(s.eqPreampDb) || 0));
+  state.eqHpHz = Number(s.eqHpHz) || 0;
+  state.eqLpHz = Number(s.eqLpHz) || 0;
   state.bgSpectrum = s.bgSpectrum !== false;
   state.bgMode = ['cover', 'custom', 'cover+custom', 'none'].includes(s.bgMode) ? s.bgMode : 'cover';
   state.bgImages = Array.isArray(s.bgImages) ? s.bgImages.filter(Boolean) : [];
@@ -692,6 +713,9 @@ function readSettingsForm() {
     eqEnabled: !!state.eqEnabled,
     eqPreset: state.eqPreset || 'FLAT',
     eqGains: normalizeEqGains(state.eqGains),
+    eqPreampDb: Number(state.eqPreampDb) || 0,
+    eqHpHz: Number(state.eqHpHz) || 0,
+    eqLpHz: Number(state.eqLpHz) || 0,
     dspPreset: state.dspPreset || state.eqPreset || 'FLAT',
   bgSpectrum: state.bgSpectrum !== false,
   bgMode: state.bgMode || 'cover',
@@ -981,6 +1005,8 @@ let masterAnalyser = null;
 let gainNode = null;
 let eqFilters = [];
 let eqPreamp = null;
+let eqHpFilter = null;
+let eqLpFilter = null;
 
 function ensureAudioGraph() {
   if (audioCtx) return;
@@ -1005,11 +1031,19 @@ function ensureAudioGraph() {
   // EQ 链：gain → preamp → bands → analyser → destination
   eqPreamp = audioCtx.createGain();
   eqPreamp.gain.value = 1;
+  eqHpFilter = audioCtx.createBiquadFilter();
+  eqHpFilter.type = 'highpass';
+  eqHpFilter.frequency.value = 10;
+  eqHpFilter.Q.value = 0.707;
+  eqLpFilter = audioCtx.createBiquadFilter();
+  eqLpFilter.type = 'lowpass';
+  eqLpFilter.frequency.value = 22050;
+  eqLpFilter.Q.value = 0.707;
   eqFilters = EQ_BANDS.map((b) => {
     const f = audioCtx.createBiquadFilter();
     f.type = b.type;
     f.frequency.value = b.freq;
-    f.Q.value = b.type === 'peaking' ? 0.9 : 0.7;
+    f.Q.value = b.q || 1.1;
     f.gain.value = 0;
     return f;
   });
@@ -1027,10 +1061,14 @@ function ensureAudioGraph() {
   }
   gainNode.connect(eqPreamp);
   let node = eqPreamp;
+  node.connect(eqHpFilter);
+  node = eqHpFilter;
   for (const f of eqFilters) {
     node.connect(f);
     node = f;
   }
+  node.connect(eqLpFilter);
+  node = eqLpFilter;
   node.connect(masterAnalyser);
   masterAnalyser.connect(audioCtx.destination);
 
@@ -1867,32 +1905,92 @@ function normalizeEqGains(list) {
   });
 }
 
+function drawEqCurve() {
+  const canvas = dom.eqCurve;
+  if (!canvas) return;
+  const { w, h } = resizeCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#1A1D24';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(42,46,56,0.9)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (h * i) / 4;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  for (let i = 1; i < 5; i++) {
+    const x = (w * i) / 5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+
+  const on = !!state.eqEnabled;
+  const gains = normalizeEqGains(state.eqGains);
+  const preDb = Number(state.eqPreampDb) || 0;
+  const fMin = 20, fMax = 20000, mid = h / 2;
+  const yScale = (h / 2) / 14;
+  ctx.beginPath();
+  for (let x = 0; x < w; x++) {
+    const f = fMin * Math.pow(fMax / fMin, x / (w - 1));
+    let db = on ? preDb : 0;
+    if (on) {
+      for (let i = 0; i < EQ_BANDS.length; i++) {
+        const b = EQ_BANDS[i];
+        const oct = Math.log2(f / b.freq);
+        const q = b.q || 1.1;
+        if (b.type === 'peaking') db += gains[i] * Math.exp(-0.5 * Math.pow(oct * q * 1.4, 2));
+        else if (b.type === 'lowshelf') db += gains[i] / (1 + Math.pow(f / b.freq, 4));
+        else db += gains[i] / (1 + Math.pow(b.freq / f, 4));
+      }
+    }
+    const y = mid - db * yScale;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = on ? 'rgba(61,219,217,0.95)' : 'rgba(139,144,154,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(139,144,154,0.35)';
+  ctx.fillRect(0, mid, w, 1);
+}
+
 function applyEqToGraph() {
   const on = !!state.eqEnabled;
   const gains = normalizeEqGains(state.eqGains);
-  // Web Audio GainNode.gain 是线性系数：0=静音，1=原音量
-  // 此处始终保持 1，EQ 只用各 Biquad 的 dB 增益
-  if (eqPreamp) eqPreamp.gain.value = 1;
+  const preDb = Math.min(12, Math.max(-12, Number(state.eqPreampDb) || 0));
+  const hp = Number(state.eqHpHz) || 0;
+  const lp = Number(state.eqLpHz) || 0;
+  if (eqPreamp) eqPreamp.gain.value = on ? Math.pow(10, preDb / 20) : 1;
   if (gainNode) gainNode.gain.value = 1;
   eqFilters.forEach((f, i) => {
     if (!f) return;
-    f.gain.value = on ? gains[i] : 0; // BiquadFilter.gain 单位是 dB
+    f.gain.value = on ? gains[i] : 0;
   });
+  if (eqHpFilter) {
+    eqHpFilter.frequency.value = on && hp > 0 ? hp : 10;
+  }
+  if (eqLpFilter) {
+    eqLpFilter.frequency.value = on && lp > 0 ? lp : 22050;
+  }
   if (dom.btnEq) {
     dom.btnEq.classList.toggle('active', on);
     dom.btnEq.textContent = on ? 'EQ ON' : '均衡器';
   }
   updateEqStatus();
+  drawEqCurve();
 }
 
 function updateEqStatus() {
   if (!dom.eqStatus) return;
   const on = state.eqEnabled ? 'ON' : 'OFF';
   const preset = state.eqPreset || 'FLAT';
-  const gains = normalizeEqGains(state.eqGains)
-    .map((g) => `${g > 0 ? '+' : ''}${g}`)
-    .join(' / ');
-  dom.eqStatus.textContent = `EQ: ${on} · ${preset} · ${gains} dB`;
+  const pre = Number(state.eqPreampDb) || 0;
+  const hp = Number(state.eqHpHz) || 0;
+  const lp = Number(state.eqLpHz) || 0;
+  const bits = [];
+  if (pre) bits.push(`PRE ${pre > 0 ? '+' : ''}${pre}dB`);
+  if (hp) bits.push(`HP ${hp}Hz`);
+  if (lp) bits.push(`LP ${lp >= 1000 ? (lp / 1000) + 'k' : lp}Hz`);
+  dom.eqStatus.textContent = `EQ: ${on} · ${preset} · 10-BAND` + (bits.length ? ` · ${bits.join(' / ')}` : '');
 }
 
 function renderEqBands() {
@@ -1900,11 +1998,28 @@ function renderEqBands() {
   const gains = normalizeEqGains(state.eqGains);
   dom.eqBands.innerHTML = EQ_BANDS.map((b, i) => `
     <div class="eq-band" data-band="${i}">
-      <div class="eq-db" id="eqDb${i}">${gains[i] > 0 ? '+' : ''}${gains[i]} dB</div>
+      <div class="eq-db" id="eqDb${i}">${gains[i] > 0 ? '+' : ''}${gains[i] || 0}</div>
       <input type="range" min="-12" max="12" step="0.5" value="${gains[i]}" data-band="${i}" aria-label="${b.label}Hz" ${state.eqEnabled ? '' : 'disabled'} />
-      <div class="eq-freq">${b.label}Hz</div>
+      <div class="eq-freq">${b.label}</div>
     </div>
   `).join('');
+
+  if (dom.eqPreamp) {
+    dom.eqPreamp.value = String(Number(state.eqPreampDb) || 0);
+    dom.eqPreamp.disabled = !state.eqEnabled;
+  }
+  if (dom.eqPreampVal) {
+    const pre = Number(state.eqPreampDb) || 0;
+    dom.eqPreampVal.textContent = `${pre > 0 ? '+' : ''}${pre.toFixed(1)} dB`;
+  }
+  if (dom.eqHp) {
+    dom.eqHp.value = String(Number(state.eqHpHz) || 0);
+    dom.eqHp.disabled = !state.eqEnabled;
+  }
+  if (dom.eqLp) {
+    dom.eqLp.value = String(Number(state.eqLpHz) || 0);
+    dom.eqLp.disabled = !state.eqEnabled;
+  }
 
   dom.eqBands.querySelectorAll('input[type="range"]').forEach((input) => {
     input.addEventListener('input', () => {
@@ -1919,12 +2034,42 @@ function renderEqBands() {
         dom.btnDsp.classList.add('active');
       }
       const db = el(`eqDb${idx}`);
-      if (db) db.textContent = `${val > 0 ? '+' : ''}${val} dB`;
+      if (db) db.textContent = `${val > 0 ? '+' : ''}${val}`;
       resumeCtx();
       applyEqToGraph();
       persistSettingsFromForm();
     });
   });
+  if (dom.eqPreamp) {
+    dom.eqPreamp.oninput = () => {
+      state.eqPreampDb = Number(dom.eqPreamp.value) || 0;
+      if (dom.eqPreampVal) {
+        const pre = state.eqPreampDb;
+        dom.eqPreampVal.textContent = `${pre > 0 ? '+' : ''}${pre.toFixed(1)} dB`;
+      }
+      state.eqPreset = 'CUSTOM';
+      resumeCtx();
+      applyEqToGraph();
+      persistSettingsFromForm();
+    };
+  }
+  if (dom.eqHp) {
+    dom.eqHp.onchange = () => {
+      state.eqHpHz = Number(dom.eqHp.value) || 0;
+      resumeCtx();
+      applyEqToGraph();
+      persistSettingsFromForm();
+    };
+  }
+  if (dom.eqLp) {
+    dom.eqLp.onchange = () => {
+      state.eqLpHz = Number(dom.eqLp.value) || 0;
+      resumeCtx();
+      applyEqToGraph();
+      persistSettingsFromForm();
+    };
+  }
+  drawEqCurve();
 }
 
 function openEqPanel() {
@@ -1933,10 +2078,10 @@ function openEqPanel() {
   renderEqBands();
   if (dom.eqEnabled) dom.eqEnabled.checked = !!state.eqEnabled;
   if (dom.eqPresetSelect) {
-    const p = DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'CUSTOM';
-    dom.eqPresetSelect.value = p;
+    dom.eqPresetSelect.value = DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'CUSTOM';
   }
   updateEqStatus();
+  drawEqCurve();
   dom.eqOverlay.hidden = false;
 }
 
@@ -1951,11 +2096,13 @@ function applyDspPreset(name) {
   state.dspPreset = key;
   if (key !== 'CUSTOM') {
     state.eqGains = DSP_PRESETS[key].slice();
+    if (key === 'FLAT') {
+      state.eqPreampDb = 0;
+      state.eqHpHz = 0;
+      state.eqLpHz = 0;
+    }
   }
-  if (!state.eqEnabled && key !== 'FLAT') {
-    // 选择非 FLAT 预设时自动打开 EQ，便于立刻听出效果
-    state.eqEnabled = true;
-  }
+  if (!state.eqEnabled && key !== 'FLAT') state.eqEnabled = true;
   if (dom.btnDsp) {
     dom.btnDsp.textContent = key;
     dom.btnDsp.classList.toggle('active', key !== 'FLAT');
@@ -3606,7 +3753,7 @@ if (dom.waveHit) {
 }
 
 // DSP / EQ
-const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE'];
+const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE', 'BASS', 'TREBLE'];
 let dspCycleIdx = 0;
 
 if (dom.btnDsp) {

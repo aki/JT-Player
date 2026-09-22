@@ -206,12 +206,41 @@
                 <option value="JAZZ">JAZZ 爵士</option>
                 <option value="ROCK">ROCK 摇滚</option>
                 <option value="HEADPHONE">HEADPHONE 耳机</option>
+                <option value="BASS">BASS 低音</option>
+                <option value="TREBLE">TREBLE 高音</option>
                 <option value="CUSTOM">CUSTOM 自定义</option>
               </select>
+              <label class="eq-power">
+                <span>低切</span>
+                <select id="eqHp">
+                  <option value="0">关闭</option>
+                  <option value="20">20 Hz</option>
+                  <option value="30">30 Hz</option>
+                  <option value="40">40 Hz</option>
+                </select>
+              </label>
+              <label class="eq-power">
+                <span>高切</span>
+                <select id="eqLp">
+                  <option value="0">关闭</option>
+                  <option value="16000">16 kHz</option>
+                  <option value="18000">18 kHz</option>
+                  <option value="20000">20 kHz</option>
+                </select>
+              </label>
               <button type="button" class="btn" id="btnEqReset">重置</button>
             </div>
-            <div class="eq-bands" id="eqBands"></div>
-            <div class="eq-status mono dim" id="eqStatus">EQ: OFF · FLAT</div>
+            <div class="eq-preamp-row">
+              <span class="eq-k">前级</span>
+              <input type="range" id="eqPreamp" min="-12" max="12" step="0.5" />
+              <span class="mono signal" id="eqPreampVal">0.0 dB</span>
+            </div>
+            <canvas id="eqCurve" class="eq-curve" height="120"></canvas>
+            <div class="eq-bands pro" id="eqBands"></div>
+            <div class="eq-scale mono dim">
+              <span>+12</span><span>+6</span><span>0</span><span>-6</span><span>-12</span>
+            </div>
+            <div class="eq-status mono dim" id="eqStatus">EQ: OFF · FLAT · 10-BAND</div>
           </section>
         </div>
         <div class="settings-foot">
