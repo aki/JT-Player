@@ -33,7 +33,15 @@ function destroyTrayPopup() {
 
 function showTrayPopup() {
   if (!tray) return;
-  destroyTrayPopup();
+  if (trayPopup && !trayPopup.isDestroyed()) {
+    try {
+      trayPopup.webContents.send('tray:state', mediaPlaying);
+      trayPopup.focus();
+      return;
+    } catch {
+      destroyTrayPopup();
+    }
+  }
   trayPopup = new BrowserWindow({
     width: 280,
     height: 56,
@@ -70,7 +78,11 @@ function showTrayPopup() {
     trayPopup.webContents.send('tray:state', mediaPlaying);
   });
   trayPopup.on('blur', () => {
-    setTimeout(destroyTrayPopup, 120);
+    setTimeout(() => {
+      if (trayPopup && !trayPopup.isDestroyed() && !trayPopup.isFocused()) {
+        destroyTrayPopup();
+      }
+    }, 150);
   });
 }
 
@@ -84,6 +96,14 @@ function hideToTray() {
     tray = new Tray(icon || nativeImage.createEmpty());
     tray.setToolTip('JT Player 静听');
     tray.on('mouse-enter', showTrayPopup);
+    tray.on('mouse-leave', () => {
+      // 短暂延迟，便于移入控制条
+      setTimeout(() => {
+        if (trayPopup && !trayPopup.isDestroyed() && !trayPopup.isFocused()) {
+          destroyTrayPopup();
+        }
+      }, 400);
+    });
     tray.on('click', showTrayPopup);
     tray.on('right-click', showTrayPopup);
     tray.on('double-click', () => {
@@ -857,6 +877,8 @@ ipcMain.handle('tray:send', async (_e, cmd) => {
       mainWindow.show();
       mainWindow.focus();
     }
+    destroyTrayPopup();
+  } else if (cmd === 'hide') {
     destroyTrayPopup();
   } else if (cmd === 'quit') {
     forceQuit = true;

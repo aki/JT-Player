@@ -43,7 +43,18 @@
       border-color: #3DDBD9;
       color: #3DDBD9;
     }
-    .icon-btn svg { display: block; }
+    .icon-btn.primary .icon-play,
+    .icon-btn.primary .icon-pause {
+      display: none;
+      grid-area: 1 / 1;
+    }
+    .icon-btn.primary.is-playing .icon-pause {
+      display: block !important;
+    }
+    .icon-btn.primary:not(.is-playing) .icon-play {
+      display: block !important;
+    }
+    .icon-btn svg { display: block; grid-area: 1 / 1; }
   </style>
 </head>
 <body>
@@ -83,11 +94,27 @@
     bind('btnShow', 'show');
     bind('btnExit', 'quit');
 
-    api.onState?.((playing) => {
+    function setPlaying(playing) {
+      const btn = document.getElementById('btnPlay');
       const play = document.getElementById('iconPlay');
       const pause = document.getElementById('iconPause');
-      if (play) play.hidden = !!playing;
-      if (pause) pause.hidden = !playing;
+      if (btn) btn.classList.toggle('is-playing', !!playing);
+      if (play) {
+        play.hidden = !!playing;
+        play.style.display = playing ? 'none' : 'block';
+      }
+      if (pause) {
+        pause.hidden = !playing;
+        pause.style.display = playing ? 'block' : 'none';
+      }
+    }
+
+    setPlaying(false);
+    api.onState?.((playing) => setPlaying(playing));
+
+    // 鼠标移出整条控制条时请求关闭
+    document.addEventListener('mouseleave', () => {
+      try { window.jt?.trayHide?.(); } catch { /* ignore */ }
     });
   </script>
 </body>
