@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -12,6 +12,59 @@ const AUDIO_EXT = new Set([
 ]);
 
 let mainWindow = null;
+let tray = null;
+let closeAction = 'tray'; // tray | quit
+let forceQuit = false;
+
+function getTrayIcon() {
+  const p = path.join(__dirname, 'src', 'icon.png');
+  try {
+    if (fs.existsSync(p)) return nativeImage.createFromPath(p);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function createTray() {
+  if (tray) return tray;
+  const icon = getTrayIcon();
+  tray = new Tray(icon || nativeImage.createEmpty());
+  tray.setToolTip('JT Player 静听');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: '显示主窗口',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        },
+      },
+      {
+        label: '退出',
+        click: () => {
+          forceQuit = true;
+          if (mainWindow) mainWindow.destroy();
+          app.quit();
+        },
+      },
+    ])
+  );
+  const restore = () => {
+    if (!mainWindow) return;
+    mainWindow.show();
+    mainWindow.focus();
+  };
+  tray.on('double-click', restore);
+  tray.on('click', restore);
+  return tray;
+}
+
+function hideToTray() {
+  if (!mainWindow) return;
+  createTray();
+  mainWindow.hide();
+}
 
 // 任务管理器 / 任务栏显示为 JT Player
 app.setName('JT Player');
@@ -457,6 +510,13 @@ function createWindow() {
     }
   });
 
+  mainWindow.on('close', (e) => {
+    if (!forceQuit && closeAction === 'tray') {
+      e.preventDefault();
+      hideToTray();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -735,6 +795,26 @@ ipcMain.handle('shell:openPath', async (_e, target) => {
   }
 });
 
+ipcMain.handle('prefs:setCloseAction', async (_e, action) => {
+  closeAction = action === 'quit' ? 'quit' : 'tray';
+  return closeAction;
+});
+
+ipcMain.handle('prefs:getCloseAction', async () => closeAction);
+
+ipcMain.handle('window:hideToTray', async () => {
+  hideToTray();
+  return true;
+});
+
+ipcMain.handle('window:show', async () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  return true;
+});
+
 app.whenReady().then(() => {
   protocol.registerFileProtocol('jtfile', (request, callback) => {
     try {
@@ -754,5 +834,13 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  if (forceQuit) {
+    app.quit();
+    return;
+  }
+  if (closeAction === 'tray') {
+    createTray();
+    return;
+  }
   if (process.platform !== 'darwin') app.quit();
 });

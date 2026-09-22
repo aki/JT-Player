@@ -108,6 +108,7 @@ const dom = {
   setLyricSize: el('setLyricSize'),
   setLyricSizeVal: el('setLyricSizeVal'),
   setShowDeck: el('setShowDeck'),
+  setCloseAction: el('setCloseAction'),
   setSubtitle: el('setSubtitle'),
   setOnlineLyrics: el('setOnlineLyrics'),
   setLyricsSource: el('setLyricsSource'),
@@ -174,6 +175,7 @@ const DEFAULT_SETTINGS = {
   volumeStep: 0.05,
   autoplayAfterAdd: true,
   autoplayOnLaunch: false,
+  closeAction: 'tray',
   lyricSize: 16,
   lyricActiveColor: '#3DDBD9',
   lyricOpacity: 100,
@@ -550,6 +552,10 @@ function applySettings(s) {
   applyLyricOffset(state.lyricOffsetMs);
   applyLyricColor(s.lyricActiveColor);
   applyLyricOpacity(s.lyricOpacity);
+  state.closeAction = s.closeAction === 'quit' ? 'quit' : 'tray';
+  if (hasDesktop && window.jt.setCloseAction) {
+    try { window.jt.setCloseAction(state.closeAction); } catch { /* ignore */ }
+  }
   state.eqEnabled = !!s.eqEnabled;
   state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
   state.dspPreset = state.eqPreset;
@@ -581,6 +587,9 @@ function fillSettingsForm(s) {
   if (dom.setVolumeStep) dom.setVolumeStep.value = String(s.volumeStep || 0.05);
   if (dom.setAutoplay) dom.setAutoplay.checked = s.autoplayAfterAdd !== false;
   if (dom.setAutoplayLaunch) dom.setAutoplayLaunch.checked = !!s.autoplayOnLaunch;
+  if (dom.setCloseAction) {
+    dom.setCloseAction.value = s.closeAction === 'quit' ? 'quit' : 'tray';
+  }
   applyLyricSize(s.lyricSize);
   if (dom.setShowDeck) dom.setShowDeck.checked = s.showDeck !== false;
   if (dom.setSubtitle) dom.setSubtitle.value = s.subtitle || DEFAULT_SETTINGS.subtitle;
@@ -672,6 +681,7 @@ function readSettingsForm() {
     volumeStep: Number(dom.setVolumeStep?.value || 0.05),
     autoplayAfterAdd: dom.setAutoplay ? !!dom.setAutoplay.checked : true,
     autoplayOnLaunch: dom.setAutoplayLaunch ? !!dom.setAutoplayLaunch.checked : false,
+    closeAction: dom.setCloseAction?.value === 'quit' ? 'quit' : 'tray',
     lyricSize: normalizeLyricSize(dom.setLyricSize?.value),
     showDeck: dom.setShowDeck ? !!dom.setShowDeck.checked : true,
     subtitle: (dom.setSubtitle?.value || '').trim() || DEFAULT_SETTINGS.subtitle,
@@ -3794,6 +3804,7 @@ if (dom.settingsOverlay) {
   dom.setVolumeStep,
   dom.setAutoplay,
   dom.setAutoplayLaunch,
+  dom.setCloseAction,
   dom.setShowDeck,
   dom.setSubtitle,
   dom.setOnlineLyrics,

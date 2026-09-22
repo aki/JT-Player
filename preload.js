@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('jt', {
   openLyricsCacheDir: () => ipcRenderer.invoke('lyrics:openCacheDir'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
   openBgImages: () => ipcRenderer.invoke('dialog:openBgImages'),
+  setCloseAction: (action) => ipcRenderer.invoke('prefs:setCloseAction', action),
+  getCloseAction: () => ipcRenderer.invoke('prefs:getCloseAction'),
+  hideToTray: () => ipcRenderer.invoke('window:hideToTray'),
+  showWindow: () => ipcRenderer.invoke('window:show'),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
