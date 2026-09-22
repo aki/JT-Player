@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -26,7 +26,40 @@ function getTrayIcon() {
   return null;
 }
 
+let hideTrayTimer = null;
+
+function pointInRect(pt, r) {
+  return pt.x >= r.x && pt.x <= r.x + r.width && pt.y >= r.y && pt.y <= r.y + r.height;
+}
+
+function pointerOverTrayUI() {
+  try {
+    const pt = screen.getCursorScreenPoint();
+    if (trayPopup && !trayPopup.isDestroyed() && trayPopup.isVisible()) {
+      if (pointInRect(pt, trayPopup.getBounds())) return true;
+    }
+    if (tray) {
+      const tb = tray.getBounds();
+      const pad = { x: tb.x - 6, y: tb.y - 6, width: tb.width + 12, height: tb.height + 12 };
+      if (pointInRect(pt, pad)) return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+function scheduleHideTrayPopup(delay = 220) {
+  clearTimeout(hideTrayTimer);
+  hideTrayTimer = setTimeout(() => {
+    if (pointerOverTrayUI()) {
+      scheduleHideTrayPopup(350);
+      return;
+    }
+    destroyTrayPopup();
+  }, delay);
+}
+
 function destroyTrayPopup() {
+  clearTimeout(hideTrayTimer);
   if (trayPopup && !trayPopup.isDestroyed()) trayPopup.close();
   trayPopup = null;
 }
@@ -78,11 +111,7 @@ function showTrayPopup() {
     trayPopup.webContents.send('tray:state', mediaPlaying);
   });
   trayPopup.on('blur', () => {
-    setTimeout(() => {
-      if (trayPopup && !trayPopup.isDestroyed() && !trayPopup.isFocused()) {
-        destroyTrayPopup();
-      }
-    }, 150);
+    scheduleHideTrayPopup(150);
   });
 }
 
@@ -96,17 +125,21 @@ function hideToTray() {
     tray = new Tray(icon || nativeImage.createEmpty());
     // 不显示托盘悬停提示文字
     tray.setToolTip('');
-    tray.on('mouse-enter', showTrayPopup);
-    tray.on('mouse-leave', () => {
-      // 短暂延迟，便于移入控制条
-      setTimeout(() => {
-        if (trayPopup && !trayPopup.isDestroyed() && !trayPopup.isFocused()) {
-          destroyTrayPopup();
-        }
-      }, 400);
+    tray.on('mouse-enter', () => {
+      clearTimeout(hideTrayTimer);
+      showTrayPopup();
     });
-    tray.on('click', showTrayPopup);
-    tray.on('right-click', showTrayPopup);
+    tray.on('mouse-leave', () => {
+      scheduleHideTrayPopup(180);
+    });
+    tray.on('click', () => {
+      clearTimeout(hideTrayTimer);
+      showTrayPopup();
+    });
+    tray.on('right-click', () => {
+      clearTimeout(hideTrayTimer);
+      showTrayPopup();
+    });
     tray.on('double-click', () => {
       if (mainWindow) {
         mainWindow.show();
@@ -880,7 +913,9 @@ ipcMain.handle('tray:send', async (_e, cmd) => {
     }
     destroyTrayPopup();
   } else if (cmd === 'hide') {
-    destroyTrayPopup();
+    scheduleHideTrayPopup(80);
+  } else if (cmd === 'ping') {
+    return true;
   } else if (cmd === 'quit') {
     forceQuit = true;
     destroyTrayPopup();

@@ -145,6 +145,9 @@
     document.addEventListener('mouseleave', () => {
       try { api.hide(); } catch { /* ignore */ }
     });
+    window.addEventListener('mouseout', () => {
+      try { api.hide(); } catch { /* ignore */ }
+    });
   </script>
 </body>
 </html>
