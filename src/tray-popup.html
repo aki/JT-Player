@@ -13,7 +13,7 @@
       user-select: none;
     }
     .bar {
-      height: 64px;
+      height: 52px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -22,27 +22,24 @@
       background: linear-gradient(180deg, #12141a, #0c0d11);
       padding: 0 10px;
     }
+    /* 与主窗口控制条一致：图标按钮，文字用 title 提示 */
     .icon-btn {
-      min-width: 52px;
-      height: 52px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
       border: 1px solid #2A2E38;
       background: #1A1D24;
       color: #ECEAE6;
       border-radius: 2px;
-      padding: 4px 6px;
     }
     .icon-btn:hover {
       border-color: #3DDBD9;
       color: #3DDBD9;
     }
     .icon-btn.primary {
-      min-width: 56px;
-      height: 56px;
+      width: 40px;
+      height: 40px;
       background: rgba(61, 219, 217, 0.12);
       border-color: #3DDBD9;
       color: #3DDBD9;
@@ -62,45 +59,25 @@
       display: block;
       grid-area: 1 / 1;
     }
-    .label {
-      font-size: 10px;
-      letter-spacing: 0.04em;
-      line-height: 1;
-      color: inherit;
-      opacity: 0;
-      max-height: 0;
-      overflow: hidden;
-      transition: opacity 0.12s ease;
-    }
-    .icon-btn:hover .label,
-    .icon-btn:focus-visible .label {
-      opacity: 0.95;
-      max-height: 14px;
-    }
   </style>
 </head>
 <body>
   <div class="bar">
-    <button type="button" class="icon-btn" id="btnPrev" aria-label="上一首">
+    <button type="button" class="icon-btn" id="btnPrev" title="上一首" aria-label="上一首">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3 6l9-6v12l-9-6z"/></svg>
-      <span class="label">上一首</span>
     </button>
-    <button type="button" class="icon-btn primary" id="btnPlay" aria-label="播放或暂停">
+    <button type="button" class="icon-btn primary" id="btnPlay" title="播放/暂停" aria-label="播放或暂停">
       <svg class="icon-play" id="iconPlay" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
       <svg class="icon-pause" id="iconPause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
-      <span class="label" id="playLabel">播放暂停</span>
     </button>
-    <button type="button" class="icon-btn" id="btnNext" aria-label="下一首">
+    <button type="button" class="icon-btn" id="btnNext" title="下一首" aria-label="下一首">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l9-6-9-6v12z"/></svg>
-      <span class="label">下一首</span>
     </button>
-    <button type="button" class="icon-btn" id="btnShow" aria-label="显示主窗口">
+    <button type="button" class="icon-btn" id="btnShow" title="主窗口" aria-label="显示主窗口">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8h18"/></svg>
-      <span class="label">主窗口</span>
     </button>
-    <button type="button" class="icon-btn" id="btnExit" aria-label="退出">
+    <button type="button" class="icon-btn" id="btnExit" title="退出" aria-label="退出">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.4 5l5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
-      <span class="label">退出</span>
     </button>
   </div>
   <script>
@@ -126,8 +103,10 @@
       const btn = document.getElementById('btnPlay');
       const play = document.getElementById('iconPlay');
       const pause = document.getElementById('iconPause');
-      const label = document.getElementById('playLabel');
-      if (btn) btn.classList.toggle('is-playing', !!playing);
+      if (btn) {
+        btn.classList.toggle('is-playing', !!playing);
+        btn.title = playing ? '暂停' : '播放';
+      }
       if (play) {
         play.hidden = !!playing;
         play.style.display = playing ? 'none' : 'block';
@@ -136,7 +115,6 @@
         pause.hidden = !playing;
         pause.style.display = playing ? 'block' : 'none';
       }
-      if (label) label.textContent = '播放暂停';
     }
 
     setPlaying(false);
