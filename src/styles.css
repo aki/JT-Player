@@ -1416,12 +1416,38 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   font-size: 22px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  min-width: 5.5ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .track-readout .sep {
   width: 1px;
   height: 16px;
   background: var(--line);
   margin: 0 4px;
+}
+
+/* 码率/格式定宽，避免数字长短导致左右跳动 */
+#transportRate {
+  display: inline-block;
+  min-width: 88px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#transportFmt {
+  display: inline-block;
+  min-width: 52px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+#trackIndex,
+#trackTotal {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .transport-btns {
