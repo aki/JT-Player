@@ -2978,13 +2978,26 @@ function drawLyricBgSpectrum(forceIdle = false) {
   }
 
   // 频率刻度：与 JT Player 品牌色一致 #3DDBD9
+  // 保证最后一列为 20k，并避免贴边裁切
   ctx.font = `${Math.max(7, Math.round(7 * dpr * scale))}px Consolas, monospace`;
   ctx.fillStyle = '#3DDBD9';
   ctx.textAlign = 'center';
+  const lastLi = LYRIC_BG_HZ.length - 1;
   for (let i = 0; i < cols; i++) {
-    const t = LYRIC_BG_HZ[i % LYRIC_BG_HZ.length];
+    const li = cols === 1
+      ? lastLi
+      : Math.round((i * lastLi) / (cols - 1));
+    const t = LYRIC_BG_HZ[li];
     const x = 2 * dpr + i * (cellW + gapX) + cellW / 2;
-    ctx.fillText(t, x, labelY);
+    // 左右两侧字不裁切
+    const pad = 10 * dpr * scale;
+    const tx = Math.min(Math.max(x, pad), w - pad);
+    ctx.fillText(t, tx, labelY);
+  }
+  // 右下角补标 20k，确保可见
+  if (cols > 1) {
+    ctx.textAlign = 'right';
+    ctx.fillText('20k', w - 2 * dpr, labelY);
   }
 }
 
