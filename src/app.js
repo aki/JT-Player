@@ -2907,12 +2907,12 @@ function drawRta(forceIdle = false) {
   ctx.fillRect(0, baseY, w, 1);
 }
 
-/** 歌词区背景：PC Sound Spectrum —— 对齐参考视频「中部矮条 + 小黄格」 */
+/** 歌词区背景：PC Sound Spectrum —— 对齐参考视频「底部矮条 + 小黄格」 */
 const LYRIC_BG_HZ = [
   '32', '64', '96', '128', '160', '192', '256', '320',
   '384', '448', '512', '576', '704', '768', '832', '960',
   '1k', '1.2k', '1.6k', '2k', '2.5k', '3k', '4k', '5k',
-  '6k', '8k', '10k', '12k', '16k', '18k', '20k', '—',
+  '6k', '8k', '10k', '12k', '16k', '18k', '20k',
 ];
 
 function drawLyricBgSpectrum(forceIdle = false) {
@@ -2926,19 +2926,18 @@ function drawLyricBgSpectrum(forceIdle = false) {
   ctx.clearRect(0, 0, w, h);
   const dpr = window.devicePixelRatio || 1;
 
-  // 按画布宽度相对 720px 设计稿等比放大
-  const designW = 720;
-  const scale = Math.max(1, (w / dpr) / designW);
-  const cellW = Math.round(16 * dpr * scale);
-  const cellH = Math.round(6 * dpr * scale);
-  const gapX = Math.max(1, Math.round(2 * dpr * scale));
-  const gapY = Math.max(1, Math.round(1 * dpr * scale));
-  const maxStack = 6;
-  const cols = Math.max(8, Math.floor((w - 4 * dpr) / (cellW + gapX)));
-  const labelH = Math.max(10, Math.round(10 * dpr * scale));
-  const stripTop = Math.max(2, Math.round(4 * dpr * scale));
+  // 格子宽扁 + 贴底排版
+  const labelH = Math.max(12, 12 * dpr);
+  const cellW = Math.max(6, Math.round(10 * dpr));
+  const cellH = Math.max(3, Math.round(4 * dpr));
+  const gapX = Math.max(1, Math.round(1 * dpr));
+  const gapY = Math.max(1, Math.round(1 * dpr));
+  const maxStack = 5;
   const stackH = maxStack * cellH + (maxStack - 1) * gapY;
-  const labelY = stripTop + stackH + labelH;
+  // 条带+刻度整体贴 canvas 底边
+  const labelY = h - 3 * dpr;
+  const stripTop = Math.max(0, labelY - labelH - stackH);
+  const cols = Math.max(12, Math.floor((w - 4 * dpr) / (cellW + gapX)));
 
   const bars = state.rtaBars;
   const n = bars.length;
@@ -2952,21 +2951,17 @@ function drawLyricBgSpectrum(forceIdle = false) {
     const raw = forceIdle
       ? Math.max(0.05, 0.35 * Math.abs(Math.sin(performance.now() / 220 + i * 0.4)))
       : src;
-    // 视频里亮条不多，电平略抬升更容易看出跳动
     const v = Math.min(1, raw * 1.6);
     const lit = Math.round(v * maxStack);
     peaks[i] = v >= peaks[i] ? v : Math.max(v, peaks[i] - 0.05);
     const peakLit = Math.round(peaks[i] * maxStack);
-
     const x = 2 * dpr + i * (cellW + gapX);
 
-    // 自底向上画小黄条，层与层紧挨
     for (let s = 0; s < maxStack; s++) {
       const y = stripTop + (maxStack - 1 - s) * (cellH + gapY);
       const on = s < lit;
       const isPeak = peakLit === s + 1 && peakLit > lit;
       if (on) {
-        // 参考视频：几乎全是亮黄
         ctx.fillStyle = '#F2E14C';
         ctx.fillRect(x, y, cellW, cellH);
       }
@@ -2977,27 +2972,17 @@ function drawLyricBgSpectrum(forceIdle = false) {
     }
   }
 
-  // 频率刻度：与 JT Player 品牌色一致 #3DDBD9
-  // 保证最后一列为 20k，并避免贴边裁切
-  ctx.font = `${Math.max(7, Math.round(7 * dpr * scale))}px Consolas, monospace`;
+  // 刻度铺满整条宽度：32Hz → 20k 必须画到最右
+  ctx.font = `${Math.max(7, Math.round(7 * dpr))}px Consolas, monospace`;
   ctx.fillStyle = '#3DDBD9';
-  ctx.textAlign = 'center';
-  const lastLi = LYRIC_BG_HZ.length - 1;
-  for (let i = 0; i < cols; i++) {
-    const li = cols === 1
-      ? lastLi
-      : Math.round((i * lastLi) / (cols - 1));
-    const t = LYRIC_BG_HZ[li];
-    const x = 2 * dpr + i * (cellW + gapX) + cellW / 2;
-    // 左右两侧字不裁切
-    const pad = 10 * dpr * scale;
-    const tx = Math.min(Math.max(x, pad), w - pad);
-    ctx.fillText(t, tx, labelY);
-  }
-  // 右下角补标 20k，确保可见
-  if (cols > 1) {
-    ctx.textAlign = 'right';
-    ctx.fillText('20k', w - 2 * dpr, labelY);
+  const padL = 12 * dpr;
+  const padR = 18 * dpr;
+  const nLab = LYRIC_BG_HZ.length;
+  for (let i = 0; i < nLab; i++) {
+    const t = LYRIC_BG_HZ[i];
+    const x = padL + (i / (nLab - 1)) * (w - padL - padR);
+    ctx.textAlign = i === 0 ? 'left' : i === nLab - 1 ? 'right' : 'center';
+    ctx.fillText(t, i === 0 ? padL * 0.4 : i === nLab - 1 ? w - 2 * dpr : x, labelY);
   }
 }
 
