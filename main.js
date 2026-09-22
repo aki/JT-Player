@@ -13,17 +13,10 @@ const AUDIO_EXT = new Set([
 
 let mainWindow = null;
 let tray = null;
+let trayPopup = null;
 let closeAction = 'tray'; // tray | quit
 let forceQuit = false;
 let mediaPlaying = false;
-
-function trayIcon(name) {
-  const p = path.join(__dirname, 'build', 'tray', name);
-  try {
-    if (fs.existsSync(p)) return nativeImage.createFromPath(p).resize({ width: 14, height: 14 });
-  } catch { /* ignore */ }
-  return undefined;
-}
 
 function getTrayIcon() {
   const p = path.join(__dirname, 'src', 'icon.png');
@@ -33,81 +26,85 @@ function getTrayIcon() {
   return null;
 }
 
-function buildTrayMenu() {
-  return Menu.buildFromTemplate([
-    {
-      label: '上一首',
-      icon: trayIcon('prev.png'),
-      click: () => mainWindow && mainWindow.webContents.send('media:control', 'prev'),
-    },
-    {
-      label: mediaPlaying ? '暂停' : '播放',
-      icon: trayIcon(mediaPlaying ? 'pause.png' : 'play.png'),
-      click: () => mainWindow && mainWindow.webContents.send('media:control', 'toggle'),
-    },
-    {
-      label: '下一首',
-      icon: trayIcon('next.png'),
-      click: () => mainWindow && mainWindow.webContents.send('media:control', 'next'),
-    },
-    { type: 'separator' },
-    {
-      label: '显示主窗口',
-      icon: trayIcon('show.png'),
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      },
-    },
-    {
-      label: '退出',
-      icon: trayIcon('exit.png'),
-      click: () => {
-        forceQuit = true;
-        if (mainWindow) mainWindow.destroy();
-        app.quit();
-      },
-    },
-  ]);
+function destroyTrayPopup() {
+  if (trayPopup && !trayPopup.isDestroyed()) trayPopup.close();
+  trayPopup = null;
 }
 
-function createTray() {
-  if (tray) return tray;
-  const icon = getTrayIcon();
-  tray = new Tray(icon || nativeImage.createEmpty());
-  tray.setToolTip('JT Player 静听');
-  tray.setContextMenu(buildTrayMenu());
-
-  const showControls = () => {
-    if (!tray) return;
-    try {
-      tray.popUpContextMenu(buildTrayMenu());
-    } catch {
-      tray.setContextMenu(buildTrayMenu());
-    }
-  };
-
-  // 悬停 / 点击：弹出小图标播放控制
-  tray.on('mouse-enter', showControls);
-  tray.on('click', showControls);
-  tray.on('right-click', () => {
-    tray.popUpContextMenu(buildTrayMenu());
+function showTrayPopup() {
+  if (!tray) return;
+  destroyTrayPopup();
+  trayPopup = new BrowserWindow({
+    width: 280,
+    height: 56,
+    frame: false,
+    resizable: false,
+    movable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    show: false,
+    backgroundColor: '#0c0d11',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
   });
-  tray.on('double-click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+
+  try {
+    const bounds = tray.getBounds();
+    const x = Math.round(bounds.x + bounds.width / 2 - 140);
+    const y = Math.round(Math.max(8, bounds.y - 64));
+    trayPopup.setPosition(x, y, false);
+  } catch { /* ignore */ }
+
+  trayPopup.loadFile(path.join(__dirname, 'src', 'tray-popup.html'));
+  trayPopup.once('ready-to-show', () => {
+    if (!trayPopup || trayPopup.isDestroyed()) return;
+    trayPopup.show();
+    trayPopup.focus();
+    trayPopup.webContents.send('tray:state', mediaPlaying);
   });
-  return tray;
+  trayPopup.on('blur', () => {
+    setTimeout(destroyTrayPopup, 120);
+  });
 }
 
 function hideToTray() {
   if (!mainWindow) return;
-  createTray();
+  if (!tray) {
+    // first time: tray created below
+  }
+  if (!tray) {
+    const icon = getTrayIcon();
+    tray = new Tray(icon || nativeImage.createEmpty());
+    tray.setToolTip('JT Player 静听');
+    tray.on('mouse-enter', showTrayPopup);
+    tray.on('click', showTrayPopup);
+    tray.on('right-click', showTrayPopup);
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      destroyTrayPopup();
+    });
+  }
   mainWindow.hide();
+}
+
+function createTray() {
+  if (tray) return tray;
+  hideToTray();
+  return tray;
+}
+
+function buildTrayMenu() {
+  return null;
 }
 
 // 任务管理器 / 任务栏显示为 JT Player
@@ -846,8 +843,28 @@ ipcMain.handle('prefs:setCloseAction', async (_e, action) => {
 
 ipcMain.handle('media:setPlaying', async (_e, on) => {
   mediaPlaying = !!on;
-  if (tray) tray.setContextMenu(buildTrayMenu());
+  if (trayPopup && !trayPopup.isDestroyed()) {
+    trayPopup.webContents.send('tray:state', mediaPlaying);
+  }
   return mediaPlaying;
+});
+
+ipcMain.handle('tray:send', async (_e, cmd) => {
+  if (cmd === 'toggle' || cmd === 'prev' || cmd === 'next') {
+    if (mainWindow) mainWindow.webContents.send('media:control', cmd);
+  } else if (cmd === 'show') {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    destroyTrayPopup();
+  } else if (cmd === 'quit') {
+    forceQuit = true;
+    destroyTrayPopup();
+    if (mainWindow) mainWindow.destroy();
+    app.quit();
+  }
+  return cmd;
 });
 
 ipcMain.handle('prefs:getCloseAction', async () => closeAction);

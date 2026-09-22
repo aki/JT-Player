@@ -37,6 +37,7 @@
       "package.json",
       "build/icon.png",
       "build/icon.ico",
+      "build/tray/**/*",
       "node_modules/**/*"
     ],
     "asar": false,

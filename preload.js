@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('jt', {
   showWindow: () => ipcRenderer.invoke('window:show'),
   setMediaPlaying: (on) => ipcRenderer.invoke('media:setPlaying', on),
   onMediaControl: (cb) => ipcRenderer.on('media:control', (_e, cmd) => cb(cmd)),
+  onTrayState: (cb) => ipcRenderer.on('tray:state', (_e, playing) => cb(playing)),
+  traySend: (cmd) => ipcRenderer.invoke('tray:send', cmd),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
