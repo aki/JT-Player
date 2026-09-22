@@ -2947,9 +2947,14 @@ function drawLyricBgSpectrum(forceIdle = false) {
   const peaks = state.lyricBgPeaks;
 
   for (let i = 0; i < cols; i++) {
-    const src = bars[i % n] || 0;
+    // 将 32 段 RTA 连续插值到整条宽度，避免 i % n 导致 32-384 / 1k-6k… 分段重复
+    const t = cols <= 1 ? 0 : (i / (cols - 1)) * (n - 1);
+    const i0 = Math.floor(t);
+    const i1 = Math.min(n - 1, i0 + 1);
+    const frac = t - i0;
+    const src = (bars[i0] || 0) * (1 - frac) + (bars[i1] || 0) * frac;
     const raw = forceIdle
-      ? Math.max(0.05, 0.35 * Math.abs(Math.sin(performance.now() / 220 + i * 0.4)))
+      ? Math.max(0.05, 0.35 * Math.abs(Math.sin(performance.now() / 220 + i * 0.25)))
       : src;
     const v = Math.min(1, raw * 1.6);
     const lit = Math.round(v * maxStack);
