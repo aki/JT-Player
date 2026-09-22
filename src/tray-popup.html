@@ -2,10 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>JT Player 托盘控制</title>
+  <title></title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; cursor: default !important; }
-    body {
+    html, body {
       background: #0c0d11;
       color: #ECEAE6;
       font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
@@ -21,6 +21,7 @@
       border: 1px solid #2A2E38;
       background: linear-gradient(180deg, #12141a, #0c0d11);
       padding: 0 10px;
+      font-size: 0;
     }
     .icon-btn {
       width: 36px;
@@ -59,27 +60,28 @@
 </head>
 <body>
   <div class="bar">
-    <button type="button" class="icon-btn" id="btnPrev" title="上一首" aria-label="上一首">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3 6l9-6v12l-9-6z"/></svg>
+    <button type="button" class="icon-btn" id="btnPrev" aria-label="上一首">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3 6l9-6v12l-9-6z"/></svg>
     </button>
-    <button type="button" class="icon-btn primary" id="btnPlay" title="播放/暂停" aria-label="播放或暂停">
-      <svg class="icon-play" id="iconPlay" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"/></svg>
-      <svg class="icon-pause" id="iconPause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
+    <button type="button" class="icon-btn primary" id="btnPlay" aria-label="播放或暂停">
+      <svg class="icon-play" id="iconPlay" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
+      <svg class="icon-pause" id="iconPause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
     </button>
-    <button type="button" class="icon-btn" id="btnNext" title="下一首" aria-label="下一首">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l9-6-9-6v12z"/></svg>
+    <button type="button" class="icon-btn" id="btnNext" aria-label="下一首">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l9-6-9-6v12z"/></svg>
     </button>
-    <button type="button" class="icon-btn" id="btnShow" title="显示主窗口" aria-label="显示主窗口">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8h18"/></svg>
+    <button type="button" class="icon-btn" id="btnShow" aria-label="显示主窗口">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8h18"/></svg>
     </button>
-    <button type="button" class="icon-btn" id="btnExit" title="退出" aria-label="退出">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.4 5l5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
+    <button type="button" class="icon-btn" id="btnExit" aria-label="退出">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.4 5l5.6 5.6L17.6 5 19 6.4 13.4 12 19 17.6 17.6 19 12 13.4 6.4 19 5 17.6 10.6 12 5 6.4z"/></svg>
     </button>
   </div>
   <script>
     const api = {
       send: (cmd) => window.jt?.traySend?.(cmd),
       onState: (cb) => window.jt?.onTrayState?.(cb),
+      hide: () => window.jt?.trayHide?.(),
     };
     function bind(id, cmd) {
       const el = document.getElementById(id);
@@ -112,9 +114,8 @@
     setPlaying(false);
     api.onState?.((playing) => setPlaying(playing));
 
-    // 鼠标移出整条控制条时请求关闭
     document.addEventListener('mouseleave', () => {
-      try { window.jt?.trayHide?.(); } catch { /* ignore */ }
+      try { api.hide(); } catch { /* ignore */ }
     });
   </script>
 </body>
