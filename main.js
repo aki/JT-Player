@@ -43,8 +43,8 @@ function showTrayPopup() {
     }
   }
   trayPopup = new BrowserWindow({
-    width: 280,
-    height: 56,
+    width: 300,
+    height: 64,
     frame: false,
     resizable: false,
     movable: false,
@@ -65,8 +65,8 @@ function showTrayPopup() {
 
   try {
     const bounds = tray.getBounds();
-    const x = Math.round(bounds.x + bounds.width / 2 - 140);
-    const y = Math.round(Math.max(8, bounds.y - 64));
+    const x = Math.round(bounds.x + bounds.width / 2 - 150);
+    const y = Math.round(Math.max(8, bounds.y - 72));
     trayPopup.setPosition(x, y, false);
   } catch { /* ignore */ }
 
