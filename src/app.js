@@ -1101,6 +1101,9 @@ function setEngine(playing) {
   dom.dspLine.textContent = next
     ? `DSP: 32-BIT FLOAT · ${state.dspPreset || 'FLAT'}${state.eqEnabled ? ' · EQ' : ''} · ACTIVE`
     : `DSP: 32-BIT FLOAT · ${state.dspPreset || 'FLAT'}${state.eqEnabled ? ' · EQ' : ''} · 待机`;
+  if (hasDesktop && window.jt.setMediaPlaying) {
+    try { window.jt.setMediaPlaying(next); } catch { /* ignore */ }
+  }
 }
 
 function syncEngineFromAudio() {
@@ -3874,5 +3877,14 @@ window.addEventListener('pagehide', () => {
 if (hasDesktop && window.jt.onOpenPaths) {
   window.jt.onOpenPaths(async (paths) => {
     if (Array.isArray(paths) && paths.length) await addPaths(paths);
+  });
+}
+
+if (hasDesktop && window.jt.onMediaControl) {
+  window.jt.onMediaControl((cmd) => {
+    if (cmd === 'toggle') togglePlay();
+    else if (cmd === 'next') dom.btnNext && dom.btnNext.click();
+    else if (cmd === 'prev') dom.btnPrev && dom.btnPrev.click();
+    else if (cmd === 'show' && window.jt.showWindow) window.jt.showWindow();
   });
 }
