@@ -2538,17 +2538,8 @@ async function loadTrack(i, autoplay = true, options = {}) {
   applyVolume();
   loadTrackLyrics(track);
 
-  const trackId = track.id;
-  // 大文件不强制解码波形，避免占用数百 MB
+  // 始终使用轻量合成波形；全曲 decodeAudioData 会在播放后半段挤占内存导致中断
   state.wavePeaks = syntheticPeaks(track.path || track.name || src);
-  if ((track.duration || 0) * 2 * 2 < 20e6) {
-    extractPeaks(track).then((peaks) => {
-      if (state.tracks[state.index]?.id === trackId && peaks) {
-        state.wavePeaks = peaks;
-        drawWave();
-      }
-    }).catch(() => { /* keep synthetic */ });
-  }
 
   // 元数据就绪后再定位，避免从头播
   const ready = await waitAudioReady(5000);
@@ -3493,7 +3484,7 @@ function tryBlobAudioFallback(track) {
     try {
       const buf = await window.jt.readBuffer(track.path);
       if (!buf || buf.byteLength < 16) return false;
-      if (buf.byteLength > 120 * 1024 * 1024) return false;
+      if (buf.byteLength > 32 * 1024 * 1024) return false;
       const blob = new Blob([buf], { type: mimeForAudioName(track.name || track.path) });
       if (track.blobUrl) {
         try { URL.revokeObjectURL(track.blobUrl); } catch { /* ignore */ }
