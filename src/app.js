@@ -3413,28 +3413,36 @@ function onMediaError(el) {
     const track = state.tracks[state.index];
     if (!track) return;
 
-    const needFallback = /\.(mp4|m4v|m4a|webm|aac)$/i.test(track.name || '');
-    if (needFallback && !track.blobTried && track.path && hasDesktop) {
+    // 播放中途出错：先 Blob 回退重解码（含 FLAC/MP3），比只覆盖 MP4 更稳
+    if (!track.blobTried && track.path && hasDesktop) {
       track.blobTried = true;
-      dom.statusNowPlaying.textContent = `兼容解码中：${track.name}…`;
+      dom.statusNowPlaying.textContent = `重试解码：${track.name}…`;
       const ok = await tryBlobAudioFallback(track);
       if (ok) {
         try {
           await media().play();
           setEngine(true);
+          dom.statusNowPlaying.textContent = `正在播放：${track.meta?.title || track.name}`;
           return;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
     }
 
     track.unsupported = true;
     renderPlaylist();
     setEngine(false);
+
+    const code = el && el.error ? el.error.code : 0;
+    // 2=MEDIA_ERR_NETWORK 3=MEDIA_ERR_DECODE 4=MEDIA_ERR_SRC_NOT_SUPPORTED
     let hint = '格式或编码不受支持';
-    if (/\.(mp4|m4v)$/i.test(track.name || '')) {
+    if (code === 2) hint = '读取中断，请检查文件是否被占用';
+    else if (code === 3) hint = '文件可能损坏或不完整（解码失败）';
+    else if (/\.(mp4|m4v)$/i.test(track.name || '')) {
       hint = 'MP4 若为 HEVC/AC3/DTS 等音轨，内置 Chromium 无法解码';
     }
-    dom.statusNowPlaying.textContent = `无法播放：${track.name}（${hint}）`;
+    dom.statusNowPlaying.textContent = `播放中断：${track.name}（${hint}）`;
   };
 }
 
