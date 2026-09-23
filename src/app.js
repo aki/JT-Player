@@ -7,6 +7,7 @@ const el = (id) => document.getElementById(id);
 
 const dom = {
   audio: el('audio'),
+  audioFallback: el('audioFallback'),
   video: el('stageVideo'),
   stageVisual: el('stageVisual'),
   playlist: el('playlist'),
@@ -973,11 +974,14 @@ async function restoreAppStateInner() {
 }
 
 const audio = dom.audio;
+const audioFallback = dom.audioFallback || audio;
 const video = dom.video;
+const LARGE_FILE_BYTES = 80 * 1024 * 1024;
 
-/** 当前媒体元素：视频用 <video>，其余用 <audio> */
+/** 当前媒体元素：视频用 <video>；大文件/中断回退用原生 audioFallback */
 function media() {
-  return state.videoMode ? (video || audio) : audio;
+  if (state.videoMode) return video || audio;
+  return state.useNativeAudio ? (audioFallback || audio) : audio;
 }
 
 function isVideoName(name = '') {
@@ -2528,10 +2532,20 @@ async function loadTrack(i, autoplay = true, options = {}) {
   applyStageMode();
   applyLyricBackground();
 
+  // 大 FLAC 等优先走原生 audio，绕开 Web Audio 图，降低中途解码失败
+  state.useNativeAudio = false;
+  if (!state.videoMode && track.path && hasDesktop && window.jt.readBuffer) {
+    try {
+      // 用文件体积判断；读 Buffer 仅取长度信息较贵，改用已知约定：>80MB 音频直接原生
+      const guessLarge = /\.(flac|wav|aiff?|ape)$/i.test(track.name || '') && !isVideoName(track.name);
+      if (guessLarge) state.useNativeAudio = true;
+    } catch { /* ignore */ }
+  }
+
   const el = media();
-  const other = el === audio ? video : audio;
-  if (other && other.src) {
-    try { other.pause(); } catch { /* ignore */ }
+  const others = [audio, audioFallback, video].filter((x) => x && x !== el);
+  for (const other of others) {
+    try { other.pause(); other.removeAttribute('src'); } catch { /* ignore */ }
   }
   el.src = src;
   el.load();
@@ -3399,12 +3413,41 @@ audio.addEventListener('seeked', () => {
 
 function onMediaError(el) {
   return async () => {
-    if (media() !== el) return;
+    if (media() !== el && !(el === audio && state.useNativeAudio === false)) return;
     if (state.index < 0) return;
     const track = state.tracks[state.index];
     if (!track) return;
 
-    // 播放中途出错：先 Blob 回退重解码（含 FLAC/MP3），比只覆盖 MP4 更稳
+    const pos = el && el.currentTime > 0.5 ? el.currentTime : (state.resumePosition || 0);
+
+    // 1) 后半段失败：切到原生 <audio>，不经 Web Audio，从断点续播
+    if (!state.useNativeAudio && !state.videoMode && track.path && pos > 1) {
+      state.useNativeAudio = true;
+      const nel = media();
+      try { el.pause(); } catch { /* ignore */ }
+      nel.src = track.url || null;
+      if (!nel.src && track.path && hasDesktop) {
+        const res = await window.jt.readMeta(track.path, { includeCover: false });
+        if (res.ok) {
+          track.url = res.url;
+          nel.src = res.url;
+        }
+      }
+      nel.load();
+      await waitAudioReady(5000);
+      try {
+        nel.currentTime = pos;
+        await nel.play();
+        applyVolume();
+        setEngine(true);
+        dom.statusNowPlaying.textContent = `兼容续播：${track.meta?.title || track.name}`;
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // 2) Blob 回退
     if (!track.blobTried && track.path && hasDesktop) {
       track.blobTried = true;
       dom.statusNowPlaying.textContent = `重试解码：${track.name}…`;
@@ -3424,20 +3467,29 @@ function onMediaError(el) {
     track.unsupported = true;
     renderPlaylist();
     setEngine(false);
-
     const code = el && el.error ? el.error.code : 0;
-    // 2=MEDIA_ERR_NETWORK 3=MEDIA_ERR_DECODE 4=MEDIA_ERR_SRC_NOT_SUPPORTED
     let hint = '格式或编码不受支持';
     if (code === 2) hint = '读取中断，请检查文件是否被占用';
-    else if (code === 3) hint = '文件可能损坏或不完整（解码失败）';
-    else if (/\.(mp4|m4v)$/i.test(track.name || '')) {
-      hint = 'MP4 若为 HEVC/AC3/DTS 等音轨，内置 Chromium 无法解码';
-    }
+    else if (code === 3) hint = '解码失败（文件可能损坏）';
     dom.statusNowPlaying.textContent = `播放中断：${track.name}（${hint}）`;
   };
 }
 
 audio.addEventListener('error', onMediaError(audio));
+if (audioFallback && audioFallback !== audio) {
+  audioFallback.addEventListener('error', onMediaError(audioFallback));
+  audioFallback.addEventListener('play', () => setEngine(true));
+  audioFallback.addEventListener('playing', () => setEngine(true));
+  audioFallback.addEventListener('pause', () => {
+    if (media() === audioFallback) setEngine(false);
+  });
+  audioFallback.addEventListener('ended', () => {
+    if (media() !== audioFallback) return;
+    const next = findNextIndex(state.index);
+    if (next === -1) { setEngine(false); return; }
+    loadTrack(next, true);
+  });
+}
 if (video) {
   video.addEventListener('play', () => setEngine(true));
   video.addEventListener('playing', () => setEngine(true));
