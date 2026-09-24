@@ -2441,6 +2441,31 @@ function syntheticPeaks(seedStr) {
   return peaks;
 }
 
+let midPlayRetries = 0;
+let stallTimer = null;
+
+function tryRecoverMidPlay(reason) {
+  if (state.index < 0 || state.videoMode) return;
+  const el = audio;
+  if (!el || !el.src) return;
+  if (midPlayRetries >= 3) return;
+  const pos = el.currentTime || state.resumePosition || 0;
+  if (pos < 1) return;
+  midPlayRetries += 1;
+  const wasPlaying = !el.paused;
+  dom.statusNowPlaying.textContent = '正在续播…';
+  try { el.pause(); } catch {}
+  el.load();
+  const onReady = () => {
+    el.removeEventListener('canplay', onReady);
+    try { el.currentTime = pos; } catch {}
+    if (wasPlaying) {
+      el.play().then(() => setEngine(true)).catch(() => setEngine(false));
+    }
+  };
+  el.addEventListener('canplay', onReady);
+}
+
 async function loadTrack(i, autoplay = true, options = {}) {
   if (!state.tracks.length) return;
   if (i < 0 || i >= state.tracks.length) return;
@@ -2465,6 +2490,8 @@ async function loadTrack(i, autoplay = true, options = {}) {
   }
 
   resumeCtx();
+  midPlayRetries = 0;
+  clearTimeout(stallTimer);
   state.wavePeaks = null;
   state.lastPeaks = null;
   state.lyrics.index = -1;
@@ -3409,7 +3436,23 @@ function onMediaError(el) {
   };
 }
 
-audio.addEventListener('error', onMediaError(audio));
+audio.addEventListener('stalled', () => {
+  clearTimeout(stallTimer);
+  stallTimer = setTimeout(() => tryRecoverMidPlay('stalled'), 1500);
+});
+audio.addEventListener('waiting', () => {
+  clearTimeout(stallTimer);
+  stallTimer = setTimeout(() => tryRecoverMidPlay('waiting'), 2500);
+});
+audio.addEventListener('playing', () => clearTimeout(stallTimer));
+audio.addEventListener('error', (e) => {
+  const pos = audio.currentTime || 0;
+  if (pos > 2 && midPlayRetries < 3) {
+    tryRecoverMidPlay('error');
+    return;
+  }
+  onMediaError(audio)(e);
+});
 if (video) {
   video.addEventListener('play', () => setEngine(true));
   video.addEventListener('playing', () => setEngine(true));
