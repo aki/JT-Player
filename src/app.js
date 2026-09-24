@@ -3730,12 +3730,13 @@ if (dom.waveHit) {
 
 // DSP / EQ
 const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE', 'BASS', 'TREBLE'];
-let dspCycleIdx = 0;
 
 if (dom.btnDsp) {
   dom.btnDsp.addEventListener('click', () => {
-    dspCycleIdx = (dspCycleIdx + 1) % DSP_CYCLE.length;
-    const mode = DSP_CYCLE[dspCycleIdx];
+    // 从当前预设往下轮换，避免和设置/均衡器不同步
+    const cur = state.eqPreset && DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'FLAT';
+    const idx = Math.max(0, DSP_CYCLE.indexOf(cur));
+    const mode = DSP_CYCLE[(idx + 1) % DSP_CYCLE.length];
     applyDspPreset(mode);
     dom.dspLine.textContent = state.playing
       ? `DSP: 32-BIT FLOAT · ${mode}${state.eqEnabled ? ' · EQ' : ''} · ACTIVE`
@@ -3774,6 +3775,11 @@ if (dom.eqEnabled) {
 if (dom.eqPresetSelect) {
   dom.eqPresetSelect.addEventListener('change', () => {
     applyDspPreset(dom.eqPresetSelect.value);
+  });
+}
+if (dom.eqPresetSelect) {
+  dom.eqPresetSelect.addEventListener('change', () => {
+    applyDspPreset(dom.eqPresetSelect.value || 'FLAT');
   });
 }
 if (dom.btnEqReset) {
