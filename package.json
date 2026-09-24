@@ -40,12 +40,6 @@
       "node_modules/**/*"
     ],
     "asar": false,
-    "extraResources": [
-      {
-        "from": "build/ffmpeg.exe",
-        "to": "ffmpeg.exe"
-      }
-    ],
     "win": {
       "icon": "build/icon.ico",
       "executableName": "JT Player",
