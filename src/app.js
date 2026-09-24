@@ -3420,6 +3420,30 @@ function onMediaError(el) {
       }
     }
 
+    // FFmpeg 旁路：Chromium 解不了/中途断时，转 WAV 再播
+    if (!track.ffmpegTried && track.path && hasDesktop && window.jt.decodeFallback) {
+      track.ffmpegTried = true;
+      dom.statusNowPlaying.textContent = `FFmpeg 解码中：${track.name}…`;
+      const ff = await window.jt.decodeFallback(track.path);
+      if (ff && ff.ok && ff.url) {
+        const tpos = (el && el.currentTime > 0.5) ? el.currentTime : (state.resumePosition || 0);
+        try { el.pause(); } catch {}
+        el.src = ff.url;
+        track.url = ff.url;
+        el.load();
+        await waitAudioReady(8000);
+        try {
+          if (tpos > 0) el.currentTime = Math.min(tpos, (el.duration || tpos) - 0.2);
+          await el.play();
+          setEngine(true);
+          dom.statusNowPlaying.textContent = `FFmpeg 续播：${track.meta?.title || track.name}`;
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+
     track.unsupported = true;
     renderPlaylist();
     setEngine(false);

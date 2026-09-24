@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Tray, Menu, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
 const os = require('os');
@@ -766,6 +767,66 @@ ipcMain.handle('dialog:openFolder', async () => {
   if (result.canceled) return [];
   return walkAudioFiles(result.filePaths[0]);
 });
+
+
+function getFfmpegPath() {
+  const candidates = [
+    path.join(__dirname, 'build', 'ffmpeg.exe'),
+    path.join(process.resourcesPath || '', 'ffmpeg.exe'),
+    path.join(process.resourcesPath || '', 'app', 'build', 'ffmpeg.exe'),
+    path.join(os.tmpdir(), 'ffmpeg-bin', 'ffmpeg.exe'),
+    'ffmpeg',
+  ];
+  for (const c of candidates) {
+    try {
+      if (c === 'ffmpeg') return c;
+      if (c && fs.existsSync(c)) return c;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+function getDecodeCacheDir() {
+  const dir = path.join(app.getPath('userData'), 'decode-cache');
+  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
+  return dir;
+}
+
+function decodeWithFfmpeg(filePath) {
+  return new Promise((resolve) => {
+    const ff = getFfmpegPath();
+    if (!ff) return resolve({ ok: false, error: 'ffmpeg not found' });
+    const key = require('crypto').createHash('sha1').update(String(filePath)).digest('hex').slice(0, 16);
+    const out = path.join(getDecodeCacheDir(), key + '.wav');
+    if (fs.existsSync(out) && fs.statSync(out).size > 44) {
+      return resolve({ ok: true, url: pathToFileURL(out).href, path: out, cached: true });
+    }
+    const args = ['-y', '-i', filePath, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', out];
+    const child = spawn(ff, args, { windowsHide: true });
+    let err = '';
+    child.stderr.on('data', (d) => { err = String(d); });
+    child.on('error', (e) => resolve({ ok: false, error: String(e.message || e) }));
+    child.on('close', (code) => {
+      if (code === 0 && fs.existsSync(out) && fs.statSync(out).size > 44) {
+        resolve({ ok: true, url: pathToFileURL(out).href, path: out, cached: false });
+      } else {
+        resolve({ ok: false, error: err.slice(-400) || `ffmpeg exit ${code}` });
+      }
+    });
+  });
+}
+
+
+ipcMain.handle('media:decodeFallback', async (_e, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: 'no file' };
+    return await decodeWithFfmpeg(filePath);
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+});
+
+ipcMain.handle('media:hasFfmpeg', async () => !!getFfmpegPath());
 
 ipcMain.handle('meta:read', async (_e, filePath, options) => {
   if (!filePath || !fs.existsSync(filePath)) {

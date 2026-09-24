@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('jt', {
   openLyricsCacheDir: () => ipcRenderer.invoke('lyrics:openCacheDir'),
   openPath: (p) => ipcRenderer.invoke('shell:openPath', p),
   openBgImages: () => ipcRenderer.invoke('dialog:openBgImages'),
+  decodeFallback: (filePath) => ipcRenderer.invoke('media:decodeFallback', filePath),
+  hasFfmpeg: () => ipcRenderer.invoke('media:hasFfmpeg'),
   setCloseAction: (action) => ipcRenderer.invoke('prefs:setCloseAction', action),
   getCloseAction: () => ipcRenderer.invoke('prefs:getCloseAction'),
   hideToTray: () => ipcRenderer.invoke('window:hideToTray'),
