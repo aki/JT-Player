@@ -1,7 +1,7 @@
 {
   "name": "jt-player",
   "productName": "JT Player",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "JT Player 静听 — 本地 HiFi 音乐播放器",
   "main": "main.js",
   "author": "JT Player",
@@ -49,11 +49,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-win-${target}.${ext}"
@@ -71,13 +75,41 @@
       "artifactName": "${productName}-${version}-win-portable.${ext}"
     },
     "fileAssociations": [
-      { "ext": "mp3", "name": "MP3 Audio", "role": "Viewer" },
-      { "ext": "flac", "name": "FLAC Audio", "role": "Viewer" },
-      { "ext": "wav", "name": "WAV Audio", "role": "Viewer" },
-      { "ext": "m4a", "name": "M4A Audio", "role": "Viewer" },
-      { "ext": "ogg", "name": "OGG Audio", "role": "Viewer" },
-      { "ext": "aac", "name": "AAC Audio", "role": "Viewer" },
-      { "ext": "opus", "name": "Opus Audio", "role": "Viewer" }
+      {
+        "ext": "mp3",
+        "name": "MP3 Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "flac",
+        "name": "FLAC Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "wav",
+        "name": "WAV Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "m4a",
+        "name": "M4A Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "ogg",
+        "name": "OGG Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "aac",
+        "name": "AAC Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": "opus",
+        "name": "Opus Audio",
+        "role": "Viewer"
+      }
     ],
     "extraMetadata": {
       "main": "main.js",

@@ -1,4 +1,4 @@
-/* 用 rcedit 把图标与版本信息写入已打包的 exe */
+﻿/* 鐢?rcedit 鎶婂浘鏍囦笌鐗堟湰淇℃伅鍐欏叆宸叉墦鍖呯殑 exe */
 const path = require('path');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
@@ -22,13 +22,13 @@ function apply(exe) {
   const args = [
     exe,
     '--set-icon', icon,
-    '--set-version-string', 'FileDescription', 'JT Player 静听',
-    '--set-version-string', 'ProductName', 'JT Player 静听',
+    '--set-version-string', 'FileDescription', 'JT Player 闈欏惉',
+    '--set-version-string', 'ProductName', 'JT Player 闈欏惉',
     '--set-version-string', 'CompanyName', 'JT Player',
     '--set-version-string', 'InternalName', 'JT Player',
     '--set-version-string', 'OriginalFilename', 'JT Player.exe',
-    '--set-file-version', '0.1.0',
-    '--set-product-version', '0.1.0',
+    '--set-file-version', '0.2.0',
+    '--set-product-version', '0.2.0',
   ];
   const r = spawnSync(rcedit, args, { stdio: 'inherit' });
   if (r.status !== 0) {
@@ -42,3 +42,4 @@ function apply(exe) {
 let ok = true;
 for (const t of targets) ok = apply(t) && ok;
 process.exit(ok ? 0 : 1);
+
