@@ -3136,6 +3136,24 @@ const LYRIC_BG_HZ = [
   '6k', '8k', '10k', '12k', '16k', '18k', '20k',
 ];
 
+function spectrumColorAt(t) {
+  const u = Math.min(1, Math.max(0, t));
+  // #3DDBD9 -> #D4A84B -> #D42B3A
+  let r, g, b;
+  if (u < 0.5) {
+    const k = u / 0.5;
+    r = 61 + (212 - 61) * k;
+    g = 219 + (168 - 219) * k;
+    b = 217 + (75 - 217) * k;
+  } else {
+    const k = (u - 0.5) / 0.5;
+    r = 212 + (212 - 212) * k;
+    g = 168 + (43 - 168) * k;
+    b = 75 + (58 - 75) * k;
+  }
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
 function drawLyricBgSpectrum(forceIdle = false) {
   const canvas = dom.lyricBgCanvas;
   if (!canvas || state.videoMode) return;
@@ -3188,10 +3206,9 @@ function drawLyricBgSpectrum(forceIdle = false) {
       const on = s < lit;
       const isPeak = peakLit === s + 1 && peakLit > lit;
       if (on) {
-        const ratio = (s + 0.5) / maxStack;
-        if (ratio > 0.66) ctx.fillStyle = '#D42B3A';
-        else if (ratio > 0.33) ctx.fillStyle = '#D4A84B';
-        else ctx.fillStyle = '#3DDBD9';
+        // 10 格高度渐变：青 → 金 → 红
+        const ratio = maxStack <= 1 ? 1 : s / (maxStack - 1);
+        ctx.fillStyle = spectrumColorAt(ratio);
         ctx.fillRect(x, y, cellW, cellH);
       }
       if (isPeak) {

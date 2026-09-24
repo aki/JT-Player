@@ -940,7 +940,19 @@ ipcMain.handle('window:show', async () => {
   return true;
 });
 
-app.whenReady().then(() => {
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
+if (gotLock) app.whenReady().then(() => {
   protocol.registerFileProtocol('jtfile', (request, callback) => {
     try {
       const url = request.url.replace('jtfile://', '');
