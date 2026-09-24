@@ -3182,7 +3182,9 @@ function drawLyricBgSpectrum(forceIdle = false) {
       const on = s < lit;
       const isPeak = peakLit === s + 1 && peakLit > lit;
       if (on) {
-        ctx.fillStyle = '#F2E14C';
+        if (s >= 4) ctx.fillStyle = '#D42B3A';
+        else if (s >= 2) ctx.fillStyle = '#D4A84B';
+        else ctx.fillStyle = '#3DDBD9';
         ctx.fillRect(x, y, cellW, cellH);
       }
       if (isPeak) {
