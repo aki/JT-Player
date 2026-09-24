@@ -113,6 +113,7 @@ const dom = {
   setLyricSizeVal: el('setLyricSizeVal'),
   setShowDeck: el('setShowDeck'),
   setCloseAction: el('setCloseAction'),
+  setDspPreset: el('setDspPreset'),
   setSubtitle: el('setSubtitle'),
   setOnlineLyrics: el('setOnlineLyrics'),
   setLyricsSource: el('setLyricsSource'),
@@ -575,9 +576,11 @@ function applySettings(s) {
     try { window.jt.setCloseAction(state.closeAction); } catch { /* ignore */ }
   }
   state.eqEnabled = !!s.eqEnabled;
-  state.eqPreset = DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT';
-  state.dspPreset = state.eqPreset;
-  state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[state.eqPreset] || [0,0,0,0,0,0,0,0,0,0]);
+  const preset = DSP_PRESETS[s.dspPreset] ? s.dspPreset : (DSP_PRESETS[s.eqPreset] ? s.eqPreset : 'FLAT');
+  state.eqPreset = preset;
+  state.dspPreset = preset;
+  // 有保存的增益则优先用；否则按预设展开
+  state.eqGains = normalizeEqGains(s.eqGains || DSP_PRESETS[preset] || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   state.eqPreampDb = Math.min(12, Math.max(-12, Number(s.eqPreampDb) || 0));
   state.eqHpHz = Number(s.eqHpHz) || 0;
   state.eqLpHz = Number(s.eqLpHz) || 0;
@@ -595,6 +598,7 @@ function applySettings(s) {
   }
   if (dom.eqEnabled) dom.eqEnabled.checked = state.eqEnabled;
   if (dom.eqPresetSelect) dom.eqPresetSelect.value = state.eqPreset;
+  if (dom.setDspPreset) dom.setDspPreset.value = state.dspPreset;
   document.body.classList.toggle('hide-deck', s.showDeck === false);
   if (dom.brandSub) {
     dom.brandSub.textContent = s.subtitle || DEFAULT_SETTINGS.subtitle;
@@ -610,6 +614,9 @@ function fillSettingsForm(s) {
   if (dom.setAutoplayLaunch) dom.setAutoplayLaunch.checked = !!s.autoplayOnLaunch;
   if (dom.setCloseAction) {
     dom.setCloseAction.value = s.closeAction === 'quit' ? 'quit' : 'tray';
+  }
+  if (dom.setDspPreset) {
+    dom.setDspPreset.value = DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'CUSTOM';
   }
   applyLyricSize(s.lyricSize);
   if (dom.setShowDeck) dom.setShowDeck.checked = s.showDeck !== false;
@@ -663,7 +670,7 @@ function applyLyricOffset(ms) {
 
 function openSettings() {
   if (!dom.settingsOverlay) return;
-  fillSettingsForm(loadSettings());
+  fillSettingsForm({ ...loadSettings(), ...readSettingsForm(), eqPreset: state.eqPreset, dspPreset: state.dspPreset, eqGains: state.eqGains, eqEnabled: state.eqEnabled });
   const hint = el('statePathHint');
   if (hint) {
     hint.textContent = '状态文件：读取中…';
@@ -703,6 +710,8 @@ function readSettingsForm() {
     autoplayAfterAdd: dom.setAutoplay ? !!dom.setAutoplay.checked : true,
     autoplayOnLaunch: dom.setAutoplayLaunch ? !!dom.setAutoplayLaunch.checked : false,
     closeAction: dom.setCloseAction?.value === 'quit' ? 'quit' : 'tray',
+    dspPreset: state.dspPreset || 'FLAT',
+    eqPreset: state.eqPreset || 'FLAT',
     lyricSize: normalizeLyricSize(dom.setLyricSize?.value),
     showDeck: dom.setShowDeck ? !!dom.setShowDeck.checked : true,
     subtitle: (dom.setSubtitle?.value || '').trim() || DEFAULT_SETTINGS.subtitle,
@@ -734,6 +743,12 @@ function persistSettingsFromForm() {
 if (dom.setOnlineLyrics) { /* lyrics settings handled below */ }
 
 // 歌词背景设置
+if (dom.setDspPreset) {
+  dom.setDspPreset.addEventListener('change', () => {
+    applyDspPreset(dom.setDspPreset.value || 'FLAT');
+  });
+}
+
 if (dom.setBgSpectrum) {
   dom.setBgSpectrum.addEventListener('change', () => {
     state.bgSpectrum = !!dom.setBgSpectrum.checked;
@@ -2077,10 +2092,7 @@ function openEqPanel() {
   if (!dom.eqOverlay) return;
   resumeCtx();
   renderEqBands();
-  if (dom.eqEnabled) dom.eqEnabled.checked = !!state.eqEnabled;
-  if (dom.eqPresetSelect) {
-    dom.eqPresetSelect.value = DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'CUSTOM';
-  }
+  syncDspUi();
   updateEqStatus();
   drawEqCurve();
   dom.eqOverlay.hidden = false;
@@ -2089,6 +2101,39 @@ function openEqPanel() {
 function closeEqPanel() {
   if (!dom.eqOverlay) return;
   dom.eqOverlay.hidden = true;
+}
+
+function syncDspUi() {
+  const key = DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'FLAT';
+  state.eqPreset = key;
+  state.dspPreset = key;
+  if (dom.btnDsp) {
+    dom.btnDsp.textContent = key;
+    dom.btnDsp.classList.toggle('active', key !== 'FLAT');
+  }
+  if (dom.eqPresetSelect) dom.eqPresetSelect.value = key;
+  if (dom.setDspPreset) dom.setDspPreset.value = key;
+  if (dom.eqEnabled) dom.eqEnabled.checked = !!state.eqEnabled;
+  if (dom.dspLine) {
+    const tag = `${key}${state.eqEnabled ? ' · EQ' : ''}`;
+    dom.dspLine.textContent = state.playing
+      ? `DSP: 32-BIT FLOAT · ${tag} · ACTIVE`
+      : `DSP: 32-BIT FLOAT · ${tag}`;
+  }
+}
+
+function saveEqOnly() {
+  const patch = {
+    eqEnabled: !!state.eqEnabled,
+    eqPreset: state.eqPreset || 'FLAT',
+    dspPreset: state.dspPreset || state.eqPreset || 'FLAT',
+    eqGains: normalizeEqGains(state.eqGains),
+    eqPreampDb: Number(state.eqPreampDb) || 0,
+    eqHpHz: Number(state.eqHpHz) || 0,
+    eqLpHz: Number(state.eqLpHz) || 0,
+  };
+  const s = saveSettings(patch);
+  return s;
 }
 
 function applyDspPreset(name) {
@@ -2104,21 +2149,11 @@ function applyDspPreset(name) {
     }
   }
   if (!state.eqEnabled && key !== 'FLAT') state.eqEnabled = true;
-  if (dom.btnDsp) {
-    dom.btnDsp.textContent = key;
-    dom.btnDsp.classList.toggle('active', key !== 'FLAT');
-  }
-  if (dom.eqPresetSelect) dom.eqPresetSelect.value = key;
   resumeCtx();
   applyEqToGraph();
   renderEqBands();
-  if (dom.dspLine) {
-    const tag = `${key}${state.eqEnabled ? ' · EQ' : ''}`;
-    dom.dspLine.textContent = state.playing
-      ? `DSP: 32-BIT FLOAT · ${tag} · ACTIVE`
-      : `DSP: 32-BIT FLOAT · ${tag}`;
-  }
-  persistSettingsFromForm();
+  syncDspUi();
+  saveEqOnly();
 }
 
 function openConfirm(message, onOk) {
