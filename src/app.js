@@ -3214,6 +3214,11 @@ let tdL = null;
 let tdR = null;
 
 function tick() {
+  // 窗口隐藏/托盘时跳过绘制，降低后台 CPU（不影响音频）
+  if (typeof document !== 'undefined' && document.hidden) {
+    requestAnimationFrame(tick);
+    return;
+  }
   if (masterAnalyser) {
     if (!freqData) freqData = new Uint8Array(masterAnalyser.frequencyBinCount);
     masterAnalyser.getByteFrequencyData(freqData);
