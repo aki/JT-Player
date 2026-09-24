@@ -2478,7 +2478,10 @@ function syntheticPeaks(seedStr) {
   return peaks;
 }
 
+let loadTrackSeq = 0;
+
 async function loadTrack(i, autoplay = true, options = {}) {
+  const loadToken = ++loadTrackSeq;
   if (!state.tracks.length) return;
   if (i < 0 || i >= state.tracks.length) return;
 
@@ -2490,6 +2493,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
   const track = state.tracks[i];
   renderPlaylist();
   updateNowUI();
+  if (loadToken !== loadTrackSeq) return;
 
   if (track.unsupported) {
     setEngine(false);
@@ -2532,6 +2536,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
       track.meta = { ...(track.meta || {}), ...res.data };
       track.duration = res.data.duration || track.duration || 0;
       src = track.url;
+      if (loadToken !== loadTrackSeq) return;
       updateNowUI();
       renderPlaylist();
     }
@@ -2586,6 +2591,7 @@ async function loadTrack(i, autoplay = true, options = {}) {
   }
 
   const mel = media();
+  if (loadToken !== loadTrackSeq) return;
   if (autoplay) {
     try {
       if (resumeAt > 0 && Math.abs((mel.currentTime || 0) - Math.min(resumeAt, (mel.duration || resumeAt))) > 1.5) {
@@ -3147,7 +3153,7 @@ function drawLyricBgSpectrum(forceIdle = false) {
   const cellH = Math.max(3, Math.round(4 * dpr));
   const gapX = Math.max(1, Math.round(1 * dpr));
   const gapY = Math.max(1, Math.round(1 * dpr));
-  const maxStack = 5;
+  const maxStack = 10;
   const stackH = maxStack * cellH + (maxStack - 1) * gapY;
   // 条带+刻度整体贴 canvas 底边
   const labelY = h - 3 * dpr;
@@ -3397,22 +3403,6 @@ async function clearMediaAndStop() {
 
 audio.addEventListener('play', () => setEngine(true));
 audio.addEventListener('playing', () => setEngine(true));
-audio.addEventListener('ended', () => {
-  const next = findNextIndex(state.index);
-  if (next === -1) {
-    setEngine(false);
-    return;
-  }
-  loadTrack(next, true);
-});
-audio.addEventListener('loadedmetadata', () => {
-  if (state.index >= 0 && audio.duration) {
-    state.tracks[state.index].duration = audio.duration;
-    dom.timeTotal.textContent = fmtTime(audio.duration);
-    refreshPlayTimeDisplay(audio.currentTime || 0);
-    renderPlaylist();
-  }
-});
 function onMediaError(el) {
   return async () => {
     if (media() !== el) return;

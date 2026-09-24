@@ -1,7 +1,7 @@
 {
   "name": "jt-player",
   "productName": "JT Player",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "JT Player 静听 — 本地 HiFi 音乐播放器",
   "main": "main.js",
   "author": "JT Player",
