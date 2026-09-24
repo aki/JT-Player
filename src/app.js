@@ -3764,7 +3764,7 @@ if (dom.waveHit) {
 }
 
 // DSP / EQ
-const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE', 'BASS', 'TREBLE'];
+const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE', 'BASS', 'TREBLE', 'CUSTOM'];
 
 if (dom.btnDsp) {
   dom.btnDsp.addEventListener('click', () => {
