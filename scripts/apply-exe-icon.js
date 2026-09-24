@@ -22,13 +22,13 @@ function apply(exe) {
   const args = [
     exe,
     '--set-icon', icon,
-    '--set-version-string', 'FileDescription', 'JT Player 闈欏惉',
-    '--set-version-string', 'ProductName', 'JT Player 闈欏惉',
+    '--set-version-string', 'FileDescription', 'JT Player',
+    '--set-version-string', 'ProductName', 'JT Player',
     '--set-version-string', 'CompanyName', 'JT Player',
     '--set-version-string', 'InternalName', 'JT Player',
     '--set-version-string', 'OriginalFilename', 'JT Player.exe',
-    '--set-file-version', '0.2.4',
-    '--set-product-version', '0.2.4',
+    '--set-file-version', '0.2.5',
+    '--set-product-version', '0.2.5',
   ];
   const r = spawnSync(rcedit, args, { stdio: 'inherit' });
   if (r.status !== 0) {
