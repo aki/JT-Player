@@ -507,7 +507,17 @@
     <footer class="transport">
       <div class="transport-center">
         <div class="dsp-block">
-          <button type="button" class="btn small" id="btnDsp" title="DSP 预设">DSP预设</button>
+          <select id="btnDsp" class="dsp-select" title="DSP 预设" aria-label="DSP 预设">
+            <option value="FLAT">FLAT 平坦</option>
+            <option value="VOCAL">VOCAL 人声</option>
+            <option value="CLASSIC">CLASSIC 古典</option>
+            <option value="JAZZ">JAZZ 爵士</option>
+            <option value="ROCK">ROCK 摇滚</option>
+            <option value="HEADPHONE">HEADPHONE 耳机</option>
+            <option value="BASS">BASS 低音</option>
+            <option value="TREBLE">TREBLE 高音</option>
+            <option value="CUSTOM">CUSTOM 自定义</option>
+          </select>
           <button type="button" class="btn small" id="btnEq" title="均衡器">均衡器</button>
         </div>
 

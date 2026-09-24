@@ -1616,3 +1616,16 @@ body.hide-deck .shell { grid-template-columns: 320px 1fr; }
   .shell { grid-template-columns: 260px 1fr; }
   .deck-panel { display: none; }
 }
+
+
+.dsp-block .dsp-select {
+  appearance: none;
+  min-width: 132px;
+  background: #1A1D24;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}

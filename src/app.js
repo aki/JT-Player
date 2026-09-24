@@ -593,7 +593,8 @@ function applySettings(s) {
   if (dom.setBgInterval) dom.setBgInterval.value = String(state.bgIntervalSec);
   applyLyricBackground();
   if (dom.btnDsp) {
-    dom.btnDsp.textContent = state.dspPreset;
+    if (dom.btnDsp.tagName === 'SELECT') dom.btnDsp.value = state.dspPreset;
+    else dom.btnDsp.textContent = state.dspPreset;
     dom.btnDsp.classList.toggle('active', state.dspPreset !== 'FLAT');
   }
   if (dom.eqEnabled) dom.eqEnabled.checked = state.eqEnabled;
@@ -2046,7 +2047,8 @@ function renderEqBands() {
       state.dspPreset = 'CUSTOM';
       if (dom.eqPresetSelect) dom.eqPresetSelect.value = 'CUSTOM';
       if (dom.btnDsp) {
-        dom.btnDsp.textContent = 'CUSTOM';
+        if (dom.btnDsp.tagName === 'SELECT') dom.btnDsp.value = 'CUSTOM';
+        else dom.btnDsp.textContent = 'CUSTOM';
         dom.btnDsp.classList.add('active');
       }
       const db = el(`eqDb${idx}`);
@@ -2108,7 +2110,8 @@ function syncDspUi() {
   state.eqPreset = key;
   state.dspPreset = key;
   if (dom.btnDsp) {
-    dom.btnDsp.textContent = key;
+    if (dom.btnDsp.tagName === 'SELECT') dom.btnDsp.value = key;
+    else if (dom.btnDsp) dom.btnDsp.textContent = key;
     dom.btnDsp.classList.toggle('active', key !== 'FLAT');
   }
   if (dom.eqPresetSelect) dom.eqPresetSelect.value = key;
@@ -3767,15 +3770,8 @@ if (dom.waveHit) {
 const DSP_CYCLE = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE', 'BASS', 'TREBLE', 'CUSTOM'];
 
 if (dom.btnDsp) {
-  dom.btnDsp.addEventListener('click', () => {
-    // 从当前预设往下轮换，避免和设置/均衡器不同步
-    const cur = state.eqPreset && DSP_PRESETS[state.eqPreset] ? state.eqPreset : 'FLAT';
-    const idx = Math.max(0, DSP_CYCLE.indexOf(cur));
-    const mode = DSP_CYCLE[(idx + 1) % DSP_CYCLE.length];
-    applyDspPreset(mode);
-    dom.dspLine.textContent = state.playing
-      ? `DSP: 32-BIT FLOAT · ${mode}${state.eqEnabled ? ' · EQ' : ''} · ACTIVE`
-      : `DSP: 32-BIT FLOAT · ${mode}${state.eqEnabled ? ' · EQ' : ''}`;
+  dom.btnDsp.addEventListener('change', () => {
+    applyDspPreset(dom.btnDsp.value || 'FLAT');
   });
 }
 
@@ -3838,7 +3834,7 @@ let dspIdx = 0;
 dom.btnDsp.addEventListener('click', () => {
   dspIdx = (dspIdx + 1) % DSP_MODES.length;
   const mode = DSP_MODES[dspIdx];
-  dom.btnDsp.textContent = mode;
+  if (dom.btnDsp && dom.btnDsp.tagName === 'SELECT') dom.btnDsp.value = mode;
   dom.btnDsp.classList.toggle('active', mode !== 'FLAT');
   dom.dspLine.textContent = state.playing
     ? `DSP: 32-BIT FLOAT · ${mode} · ACTIVE`
