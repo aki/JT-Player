@@ -394,7 +394,8 @@ function persistAppState(immediate = false) {
 function persistPlaybackProgress(force = false) {
   if (state.restoring) return;
   const now = Date.now();
-  if (!force && now - lastPositionSaveAt < 1000) return;
+  // 播放中写盘降频：避免约 3 分钟后 IPC/写盘卡住媒体
+  if (!force && now - lastPositionSaveAt < 8000) return;
   lastPositionSaveAt = now;
   const track = state.index >= 0 ? state.tracks[state.index] : null;
   const pos = currentPlaybackPosition();
@@ -3368,35 +3369,6 @@ audio.addEventListener('loadedmetadata', () => {
     renderPlaylist();
   }
 });
-audio.addEventListener('timeupdate', () => {
-  if (state.videoMode) return;
-  if (!audio.src || audio.paused) return;
-  if (state.index < 0) return;
-  state.resumePosition = audio.currentTime || 0;
-  const track = state.tracks[state.index];
-  if (track?.path && state.resumePosition > 0.8) {
-    state.trackPositions = state.trackPositions || {};
-    state.trackPositions[pathKeyOf(track.path)] = state.resumePosition;
-  }
-  persistPlaybackProgress(false);
-});
-audio.addEventListener('pause', () => {
-  if (state.videoMode) return;
-  state.resumePosition = audio.currentTime || state.resumePosition || 0;
-  const track = state.index >= 0 ? state.tracks[state.index] : null;
-  if (track?.path && state.resumePosition > 0.8) {
-    state.trackPositions = state.trackPositions || {};
-    state.trackPositions[pathKeyOf(track.path)] = state.resumePosition;
-  }
-  persistAppState(true);
-});
-audio.addEventListener('seeked', () => {
-  if (state.videoMode) return;
-  state.resumePosition = audio.currentTime || 0;
-  if (!state.videoMode) syncLyrics(audio.currentTime || 0, true);
-  persistPlaybackProgress(true);
-});
-
 function onMediaError(el) {
   return async () => {
     if (media() !== el) return;
