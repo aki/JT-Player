@@ -27,8 +27,8 @@ function apply(exe) {
     '--set-version-string', 'CompanyName', 'JT Player',
     '--set-version-string', 'InternalName', 'JT Player',
     '--set-version-string', 'OriginalFilename', 'JT Player.exe',
-    '--set-file-version', '0.2.3',
-    '--set-product-version', '0.2.3',
+    '--set-file-version', '0.2.4',
+    '--set-product-version', '0.2.4',
   ];
   const r = spawnSync(rcedit, args, { stdio: 'inherit' });
   if (r.status !== 0) {
