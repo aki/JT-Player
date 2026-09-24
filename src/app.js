@@ -3807,11 +3807,6 @@ if (dom.eqEnabled) {
 }
 if (dom.eqPresetSelect) {
   dom.eqPresetSelect.addEventListener('change', () => {
-    applyDspPreset(dom.eqPresetSelect.value);
-  });
-}
-if (dom.eqPresetSelect) {
-  dom.eqPresetSelect.addEventListener('change', () => {
     applyDspPreset(dom.eqPresetSelect.value || 'FLAT');
   });
 }
@@ -3828,25 +3823,6 @@ dom.fileInput.addEventListener('change', async () => {
   if (files?.length) await addBrowserFiles(files);
   dom.fileInput.value = '';
   dom.fileInput.removeAttribute('webkitdirectory');
-});
-
-// DSP / EQ stubs
-const DSP_MODES = ['FLAT', 'VOCAL', 'CLASSIC', 'JAZZ', 'ROCK', 'HEADPHONE'];
-let dspIdx = 0;
-dom.btnDsp.addEventListener('click', () => {
-  dspIdx = (dspIdx + 1) % DSP_MODES.length;
-  const mode = DSP_MODES[dspIdx];
-  if (dom.btnDsp) dom.btnDsp.textContent = mode;
-  dom.btnDsp.classList.toggle('active', mode !== 'FLAT');
-  dom.dspLine.textContent = state.playing
-    ? `DSP: 32-BIT FLOAT · ${mode} · ACTIVE`
-    : `DSP: 32-BIT FLOAT · ${mode}`;
-});
-
-dom.btnEq.addEventListener('click', () => {
-  dom.btnEq.classList.toggle('active');
-  const on = dom.btnEq.classList.contains('active');
-  dom.btnEq.textContent = on ? 'EQ ON' : '均衡器';
 });
 
 // Keyboard
